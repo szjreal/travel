@@ -1,6 +1,11 @@
 <template>
   <div class="budget-table">
     <van-cell-group :border="false">
+      <!-- 遍历对象 -->
+       <!-- value:1200  key:'accommodation' -->
+        <!-- budgetItems是一个对象 -->
+         <!-- getLabel 函数把英文 key 翻译成中文： -->
+          <!-- getLabel('accommodation') → '住宿' -->
       <van-cell
         v-for="(value, key) in budgetItems"
         :key="key"

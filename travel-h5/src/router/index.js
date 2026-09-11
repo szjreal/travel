@@ -44,6 +44,19 @@ const router = createRouter({
 })
 
 // 全局前置守卫：每次路由跳转前都会执行
+//如果我在未登录时候直接输入http://localhost:5173/favorites
+//进入beforeEach，三个函数自动填好
+//to = {
+//   path: '/favorites',
+//   fullPath: '/favorites',
+//   meta: { needLogin: true },   // ← 路由配置里 favorites 写了 meta.needLogin: true
+//   name: 'Favorites',
+//   ...
+// }
+
+// from = { path: '/', ... }   // 从首页过来的
+
+
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
 

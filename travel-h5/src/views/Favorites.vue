@@ -93,6 +93,12 @@ const fetchList = async () => {
 // 查看详情：把收藏的 plan_data 通过路由传递给 Detail 页
 const viewDetail = (item) => {
   // 把行程数据存到 sessionStorage，Detail 页接收后直接展示
+  //sessionStorage:
+// {
+//   'favoritePlan': '{"id":1,"city":"北京","budget":300,"plan_data":{...}}'
+//    ────┬──────   ─────────────────────────┬────────────────────────
+//       key名                             value值（一串文本）
+// }
   sessionStorage.setItem('favoritePlan', JSON.stringify(item))
   router.push({
     path: '/detail',
@@ -116,6 +122,15 @@ const handleDelete = (id) => {
       if (res.code === 0) {
         showToast('删除成功')
         // 从列表中移除
+        //.filter() 是数组自带的过滤方法，遍历数组，返回符合条件的项组成新数组。
+        //假设
+        //list.value = [
+//   { id: 1, city: '北京' },    ← 删的是这条（id = 1）
+//   { id: 2, city: '上海' },
+//   { id: 3, city: '成都' },
+// ]
+//删 id = 1 后执行 .filter：
+// list.value.filter(item => item.id !== 1)
         list.value = list.value.filter(item => item.id !== id)
       }
     } catch (err) {

@@ -89,6 +89,7 @@ const handleLogin = async () => {
   // 2. 调接口
   isLoading.value = true
   try {
+  
     const res = await post('/auth/login', {
       username: formData.username,
       password: formData.password
@@ -96,10 +97,16 @@ const handleLogin = async () => {
 
    if (res.code === 0) {
   // 登录成功：存 token 和 user
-  localStorage.setItem('token', res.token)
+  // setItem存  getItem 取  removeItem删
+localStorage.setItem('token', res.token)
   localStorage.setItem('user', JSON.stringify(res.user))
  showToast('登录成功')
 // 判断是否要跳回原页面
+//很重要
+//第一种情况，如果在profile页面点击去登陆，直接跳转到http://localhost:5173/login，然后输入用户名和密码以后点击登录，经过路由守卫，虽然没有token，但也没有to.meta.needLogin，于是放行，于是就没有 route.query.redirect，于是跳回/profile。
+//第二种情况，直接输入http://localhost:5173/favorites，经过路由守卫，符合to.meta.needLogin && !token，于是组合成/login?redirect=/favorites，经过const redirect = route.query.redirect
+//if (redirect) {
+ // router.push(redirect)  ，就返回/favorites
 const redirect = route.query.redirect
 if (redirect) {
   router.push(redirect)      // 跳回登录前想去的页面

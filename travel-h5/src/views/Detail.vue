@@ -17,7 +17,9 @@
     <van-button type="primary" @click="fetchTripData">重新生成</van-button>
   
   </div>
-
+<!-- 当上面两个分支都不成立时（既不在 loading，也没有 errorMsg），并且 tripData 已经有数据、
+且后端返回的 success 字段不为 false 时，
+才渲染整个行程内容（概览卡、每日折叠面板、预算表、温馨提示、注意事项）。 -->
  <template v-else-if="tripData && tripData.success !== false">
   <div class="card overview-card">
 <div class="trip-header">
@@ -25,6 +27,7 @@
   <div class="trip-budget">预算：{{tripData.totalBudget}}元</div>
 </div>
   </div>
+  <!-- van-collapse 是外层折叠容器，activeDays (Detail.vue#L107) 是一个 ref([]) 数组 -->
   <van-collapse v-model="activeDays" class="trip-collapse">
     <van-collapse-item v-for="day in tripData.dailyItinerary" 
     :key="day.day" 
@@ -33,14 +36,20 @@
      <div class="day-schedule">
 <div class="schedule-section">
   <div class="section-label morning">上午</div>
+  <!-- SpotItem 组件用于渲染景点信息 -->
+   <!-- :data是父子组件传值的方法 -->
   <SpotItem :data="day.morning" /> 
 </div>
 <div class="schedule-section">
   <div class="section-label afternoon">下午</div>
+   <!-- SpotItem 组件用于渲染景点信息 -->
+  <!-- :data是父子组件传值的方法 -->
   <SpotItem :data="day.afternoon" /> 
 </div>
 <div class="schedule-section">
   <div class="section-label evening">晚上</div>
+   <!-- SpotItem 组件用于渲染景点信息 -->
+  <!-- :data是父子组件传值的方法 -->
   <SpotItem :data="day.evening" /> 
 </div>
      </div>
@@ -54,6 +63,7 @@
     温馨提示
   
  <ul class="tips-list">
+   <!-- index 是Vue 自动追加的下标（从 0 开始的整数 -->
 <li v-for="(tip,index) in tripData.tips" :key="index">{{tip}}</li>
  </ul></div>
 
@@ -98,6 +108,7 @@ import BudgetTableVue from '../components/BudgetTable.vue'
 const route = useRoute()
 const router = useRouter()
 import { reactive,ref } from 'vue'
+//通过底下onmounted获取formData中的数据
 const formData = reactive({
   city: '',
   budget: null,
@@ -111,7 +122,9 @@ const isLoading = ref(true)
 // 收藏状态
 const isFavorited = ref(false)
 //获取行程数据
+//
 const fetchTripData = async ()=>{
+  //onMounted中得到formData中的数据
   const res = await post('recommend',{
     city:formData.city,
     budget:formData.budget,
@@ -131,6 +144,7 @@ const fetchTripData = async ()=>{
 
 // 检查是否已收藏（已登录才查）
 const checkFavoriteStatus = async () => {
+  // 在login登录后端时候传到浏览器的token
   const token = localStorage.getItem('token')
   if (!token) return
   try {
@@ -188,6 +202,8 @@ const handleFavorite = async () => {
   const token = localStorage.getItem('token')
   if (!token) {
     showToast('请先登录后再收藏')
+    //进入/login页面，同时redirect作为参数代表route.fullPath自动从当前页面获取到的？后面的数据
+    //然后放在/login？后面url就变成http://localhost:5173/login?city=%E5%8C%97%E4%BA%AC&budget=300&days=2
     router.push({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
@@ -202,6 +218,8 @@ const handleFavorite = async () => {
       city: formData.city,
       budget: formData.budget,
       days: formData.days,
+      //因为const tripData = ref(null)   // 第108行
+      //因为有ref，所以tripData北value{}又套了一层
       plan_data: tripData.value
     })
     if (res.code === 0) {

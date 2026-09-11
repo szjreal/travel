@@ -19,6 +19,7 @@
   <van-image :src="userAvatar" round class="avatar" />
 </div>
 
+<!-- 任何 <input type="file"> 元素被点击时，浏览器就会调用操作系统的文件选择对话框。 -->
 <input
   type="file"
   ref="avatarInput"
@@ -85,6 +86,7 @@
     </van-dialog>
 
     <!-- 修改昵称弹窗 -->
+    <!-- nicknameDialogVisible控制弹窗显示/隐藏，true=显示，false=隐藏 -->
     <van-dialog
       v-model:show="nicknameDialogVisible"
       title="修改昵称"
@@ -169,7 +171,7 @@ onMounted(async () => {
     isLoggedIn.value = true
   }
   
-  // 3. 调接口拉最新数据
+  // 3. 有第二步保底，调接口拉最新数据覆盖第二步的用户信息
   try {
     const res = await get('/auth/user')
     if (res.code === 0) {
@@ -226,15 +228,20 @@ const handleNicknameClick = () => {
     return
   }
   // 打开弹窗时，把当前昵称（或用户名）填进去方便修改
+  //|| 的规则：从左到右找第一个有值的，找到就停。
   const user = JSON.parse(localStorage.getItem('user') || '{}')
   nicknameInput.value = user.nickname || user.username || ''
   nicknameDialogVisible.value = true
 }
 
 // 确认修改昵称（before-close 钩子，返回 false 阻止关闭）
+//参数 action是 before-close 钩子，Vant 在你点弹窗按钮时自动调用它，
+// 并传一个 action 参数告诉你点的是哪个按钮：confirm 或 cancel
 const onNicknameConfirm = async (action) => {
   // 点取消直接关闭
+  //return true = 允许弹窗关闭
   if (action !== 'confirm') return true
+  //.trim() 去掉首尾空格
   const val = nicknameInput.value.trim()
   if (!val) {
     showToast('昵称不能为空')
@@ -275,16 +282,31 @@ const triggerAvatarInput = () => {
 }
 
 // 选好文件后触发
+//参数 e 是 事件对象（Event），由浏览器在触发 change 时自动传入
 const handleAvatarChange = async (e) => {
+  //e.target 就是那个 <input type="file">。
+  //.files 是用户选中的文件列表（FileList），即使 multiple 没开，也是数组形式，取 [0]
   const file = e.target.files[0]
+  //用户点了"取消"没选任何文件时,退出不报错
   if (!file) return
 
   // 转成 base64 字符串
+  //  创建文件读取器对象
+  //FileReader 是浏览器内置的文件读取 API，专门用来读取用户本地文件。
   const reader = new FileReader()
+  //读取完成后的回调
+  //onload 是一个事件处理属性，当文件读取完成时自动触发。
+  //回调函数里的 ev 是另一个事件对象，包含读取结果
+  //等下方的  reader.readAsDataURL(file) 读取完成后，才会触发 onload 事件。
   reader.onload = async (ev) => {
+    //ev.target 指向 reader 这个读取器对象。
+    //ev.target.result 是读取完成后的结果，这里是一个 base64 字符串。
+    //形如data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
+    //FileReader 这个对象有一个内置属性叫 result，专门用来存放读取结果。
     const base64 = ev.target.result
 
     // 先立刻显示在页面上（用户不用等）
+    //直接把 base64 赋值给它，Vue 会立刻刷新页面上的头像
     userAvatar.value = base64
 
     // 再发给后端存数据库

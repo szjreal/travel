@@ -82,6 +82,7 @@ fetchAIResponse(msg)
 //ai助手是否正在响应中
 const isStreaming = ref(false)
 //对话记录
+//被fetchAIResponse和addUserMessage处理
 const messages = ref([])
 // 当前流式请求的控制器，用于主动停止生成
 const currentController = ref(null)
@@ -95,10 +96,15 @@ const currentController = ref(null)
 // // 瘦身后
 // { role:'user', content:'北京有哪些景点？' }
 const buildHistory = () => {
-  return messages.value
+  //messages是addUserMessage和fetchAIResponse组合以后的结果数组
+ 
   //把content字段为空的项过滤掉，避免把空消息发给大模型
-    .filter(msg => msg.content && msg.content.trim() !== '')
+  //filter 的回调函数，作用是判断每条消息要不要保留。返回 true 就保留，false 就过滤掉。
+  //.filter(item => item.content)       // 叫 item
+  //这是js的回调函数，用来遍历拿到每一个数据，msg是自己定义的回调函数
+     return messages.value.filter(msg => msg.content && msg.content.trim() !== '')
     // 只取 role 和 content 两个字段
+    //返回一个新数组给const history = buildHistory()用
     .map(msg => ({
       role: msg.role,
       content: msg.content
@@ -127,12 +133,14 @@ const addUserMessage = (content) =>{
   })
 }
 //获取ai响应
+//userMsg是sendMessage传过去的msg
 const fetchAIResponse = (userMsg) =>{
   isStreaming.value = true
   //push 一个空的 AI 消息占位
   messages.value.push({
     id: Date.now() + 1,
     role: 'ai',
+    //下面的lastMsg.content = fullResponse改变content的值
     content: '',
     timestamp:new Date().toISOString()
   })
@@ -149,7 +157,7 @@ const fetchAIResponse = (userMsg) =>{
   // 【修改-对话记忆】把 history 一起发给后端，让大模型能看到之前的对话
    fetchStream('chat',{message:userMsg, history},
    //onChunk：分片处理逻辑
- //request.js 解析并回调（request.js:54-72）
+ //request.js 解析并回调（request.js:54-72)
 
 //JavaScript
 
@@ -165,10 +173,10 @@ const fetchAIResponse = (userMsg) =>{
 //for(const line of lines) {
  // const jsonstr = line.replace(/^data:\s*/, '').trim()
   // jsonstr = '{"type":"chunk","content":"北"}'
-  
+
   //const jsonData = JSON.parse(jsonstr)
   // jsonData = {type: 'chunk', content: '北'}
-  
+
  // if(jsonData.type === 'chunk'){
     //onChunk(jsonData.content)  // ← 调用 Chat.vue 的回调，传入 "北"
  // }
@@ -181,9 +189,12 @@ const fetchAIResponse = (userMsg) =>{
     //相当于把messages.value[messages.value.length -1]的地址赋值给lastMsg
     const lastMsg= messages.value[messages.value.length -1]
     if(lastMsg && lastMsg.role ==='ai'){
-
+//messages.value = [
+//   { id:1694156800000, role:'user', content:'北京有哪些景点？', ... },
+//   { id:1694156800001, role:'ai',   content:'故',              ... }   // ← 改了
+// ]
 lastMsg.content = fullResponse
-    } 
+    }
     scrollToBottom()
   },
   //onError：流式请求出错
@@ -204,6 +215,8 @@ lastMsg.content = fullResponse
     scrollToBottom()
   },
   //onAbort：拿到 controller，存起来供停止按钮调用
+  //fetchStream 创建 controller 后立刻调 onAbort 把它传给 Chat.vue。
+  // 现在用户点停止按钮时，能拿到这个 controller 调 abort()
   (controller)=>{
     currentController.value = controller
   })
@@ -231,7 +244,7 @@ const scrollToBottom = () => {
   }
 }
 onMounted(() => {
-  if(route.query.scene === 'detail' && route.query.city){
+  if(route.query.scene === 'chat' && route.query.city){
     inputMessage.value =`我想了解${route.query.city}的旅游景点`
   }
 })

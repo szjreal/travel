@@ -17,6 +17,19 @@ const router = express.Router();
 //   days:null
 // })相关联
 router.post("/recommend", async (req, res) => {
+    //前端post请求body是JSON格式
+    //     {
+    //   "city": "北京",
+    //   "budget": 1000,
+    //   "days": 3
+    // }
+    // 经过express.json()中间件处理后，挂载到req.body对象上
+    // req.body = {
+    //   city: "北京",
+    //   budget: 1000,
+    //   days: 3
+    // }
+    //   const {city,budget,days} = req.body;能自动拿到city,budget,days的值
     const {city,budget,days} = req.body;
     //检查参数是否为空
     if(!city || !budget || !days){
@@ -94,6 +107,8 @@ const result = await travelService.chat(message, history, (chunk)=>{
 //前端不接受，废代码
 stream.send({type:'complete',data:result});
 //上方全都执行完毕，执行streamUtils.js里的end
+//streamUtils.js里的end方法会写入end\ndata:{"done":"true"}\n\n到响应体
+//被后端的request拿到数据
 stream.end();
 
 })

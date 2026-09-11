@@ -77,14 +77,14 @@ class TravelService {
 //组装旅游规划提示词
 //getTravelPrompt 里就是发给 AI 的全部提示词（Prompt）
         const message = this.getTravelPrompt(city, budget, days);
-
+        console.log(message);
         try {
             //调用大模型
             //this.llm.invoke(message) = 调用快递员，把消息发给大模型，等回复
             //invoke等完整回复一次性回来
             const response = await this.llm.invoke(message);
             console.log(response);
-//原本返回的格式是："id": "chatcmpl-809001bfda39ee85",   // 这次对话的编号
+//返回的格式是："id": "chatcmpl-809001bfda39ee85",   // 这次对话的编号
 //   "content": "...AI 说的正文...",是invoke固定的
 
 //获取大模型的响应内容
@@ -254,7 +254,7 @@ try{        //调用大模型，获取流式响应
 
 // ④ 每个 token 包装成 AIMessageChunk
 //包装前：DeepSeek 返回的原始 SSE 数据
-// DeepSeek 服务器吐回来的是这样的原始文本（SSE 格式，和你前端收到的一模一样的格式）：
+// DeepSeek 服务器吐回来的是这样的原始文本（SSE 格式，和前端收到的一模一样的格式）：
 //data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"delta":{"content":"北"},"index":0}]}
 //包装后
 //AIMessageChunk {

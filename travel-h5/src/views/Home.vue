@@ -168,6 +168,7 @@ const handleSubmit = async () => {
    showToast('请输入行程天数，不能小于1天或大于30天')
    return
   }
+  //很重要，可以让url携带数据，方便在detail.vue中接收
   router.push({
     path:'/detail',
     //让url携带city目的地，budget预算，days行程天数参数

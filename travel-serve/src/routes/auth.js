@@ -9,12 +9,32 @@ const router = Router();
 router.post('/register', async (req, res) => {
   try {
     // 1. 从请求体里拿到用户名和密码
+    //（1）前端请求body是JSON格式
+//     {
+//   "username": "jie",
+//   "password": "152634"
+// }
+// （2）经过express.json()中间件处理后，挂载到req.body对象上
+// req.body = {
+//   username: "jie",
+//   password: "152634"
+// }
     const { username, password } = req.body;
 
     // 2. 查重：看这个用户名是否已被注册
+    //pool.query(SQL语句, 参数数组) 是让管家去 MySQL 执行一条 SQL 查询，
+    // 返回结果。返回的是一个 Promise，所以要用 await 等它查完。
     const [rows] = await pool.query(
-      'SELECT id FROM users WHERE username = ?',
-      [username]
+      'SELECT id FROM users WHERE username = ?', [username]
+     //如果有，返回[
+//   [ { id: 1 } ],               // ← 第0个元素：数组里只有1个对象（正如你所说！）
+//   [/* 字段元数据，可以忽略 */]
+// ]
+// 没有则返回
+// [
+//   [],                          // ← 第0个元素：空数组！一条都没查到
+//   [/* 字段元数据，可以忽略 */]
+// ]
     );
     if (rows.length > 0) {
       return res.json({ code: 1, msg: '用户名已存在' });
@@ -22,8 +42,8 @@ router.post('/register', async (req, res) => {
 
     // 3. 直接存入数据库（明文密码）
     await pool.query(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
-      [username, password]
+      'INSERT INTO users (username, password) VALUES (?, ?)',[username, password]
+      
     );
 
     // 4. 返回成功
@@ -41,6 +61,16 @@ router.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     // 2. 按用户名查数据库
+    //返回rows = [
+//   {
+//     id: 2,
+//     username: "jie",
+//     password: "123456",
+//     avatar: "data:image/png;...",
+//     nickname: "song",
+//     created_at: "2026-07-31 11:..."
+//   }
+// ]
     const [rows] = await pool.query(
       'SELECT * FROM users WHERE username = ?',
       [username]
@@ -58,13 +88,18 @@ router.post('/login', async (req, res) => {
     }
 
     // 5. 密码正确，签发 JWT token
+    //jwt.sign() 是第三方库 jsonwebtoken 提供的函数，
+    //作用就是「盖章发证」——把你要带的信息 + 你的密钥 + 配置 = 生成一串不可伪造的 token 字符串。
+    //token变成
+    // eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwidXNlcm5hbWUiOiJqaWUiLCJpYXQiOjE3MjUzNDUwMDAsImV4cCI6MTcyNTk0OTgwMH0.abc123DEF456ghi789JKL012mno345PQR678stu901VWX
+    //包含头部（死数据）+载荷（用户信息）+签名（加密后的字符串）
     const token = jwt.sign(
       { id: user.id, username: user.username },
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES }
     );
 
-    // 6. 返回 token 和用户信息
+    // 6. 返回 token 和用户信息给前端
     res.json({
       code: 0,
       msg: '登录成功',
@@ -179,7 +214,10 @@ router.get('/favorites', auth, async (req, res) => {
     );
     // 把 plan_data 从字符串解析回对象
     const list = rows.map(item => ({
+       // ① 展开原有字段（id, city, budget, days, created_at）
       ...item,
+      //.parse把字符串转回 JS 对象
+      //? :是三元运算符，如果item.plan_data存在，就解析为对象，否则返回null
       plan_data: item.plan_data ? JSON.parse(item.plan_data) : null
     }));
     res.json({ code: 0, data: list });
@@ -218,6 +256,7 @@ router.get('/favorite/check', auth, async (req, res) => {
       'SELECT id FROM favorites WHERE user_id = ? AND city = ? AND days = ?',
       [req.user.id, city, days]
     );
+    //如果查到id，则rows.length > 0为true，否则为false
     res.json({ code: 0, favorited: rows.length > 0 });
   } catch (err) {
     console.error('检查收藏状态失败:', err.message);
