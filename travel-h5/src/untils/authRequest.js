@@ -53,10 +53,12 @@ authRequest.interceptors.request.use(
 authRequest.interceptors.response.use(
   response => {
     // 后端返回 { code: 0, token: "...", user: {...} }
+    //axios默认包一层data
     return response.data
   },
   error => {
     // 如果是 401（未登录或 token 过期）
+    //HTTP 错误（401/500）后端返回的错误码
     if (error.response?.status === 401) {
       showToast('登录已过期，请重新登录')
       localStorage.removeItem('token')
@@ -71,7 +73,7 @@ authRequest.interceptors.response.use(
 //authRequest 是 axios创建出来的实例
 //自带post和get方法，直接调用即可
 //返回值：Promise 对象，解析出后端返回的 JSON 数据
-//上面post是自己封装的，下面post是axios自带的
+
 export function post(url, data) {
   //data部分，调用axios自带的post方法，自动放进请求体body里
   //url部分，axios自动拼接到baseurl后面

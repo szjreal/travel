@@ -77,6 +77,7 @@ const goRegister = () => {
 // 登录
 const handleLogin = async () => {
   // 1. 校验
+  //双向绑定
   if (!formData.username) {
     showToast('请输入用户名')
     return
@@ -87,9 +88,12 @@ const handleLogin = async () => {
   }
 
   // 2. 调接口
+  //登录button的loading状态处理
   isLoading.value = true
   try {
-  
+  //调用export function post(url, data) {
+  // return authRequest.post(url, data)
+  // }
     const res = await post('/auth/login', {
       username: formData.username,
       password: formData.password
@@ -99,6 +103,7 @@ const handleLogin = async () => {
   // 登录成功：存 token 和 user
   // setItem存  getItem 取  removeItem删
 localStorage.setItem('token', res.token)
+//变成json字符串
   localStorage.setItem('user', JSON.stringify(res.user))
  showToast('登录成功')
 // 判断是否要跳回原页面

@@ -102,6 +102,7 @@ const buildHistory = () => {
   //filter 的回调函数，作用是判断每条消息要不要保留。返回 true 就保留，false 就过滤掉。
   //.filter(item => item.content)       // 叫 item
   //这是js的回调函数，用来遍历拿到每一个数据，msg是自己定义的回调函数
+  //msg.content.trim() !== ''去掉首尾空格后，不是空就是true
      return messages.value.filter(msg => msg.content && msg.content.trim() !== '')
     // 只取 role 和 content 两个字段
     //返回一个新数组给const history = buildHistory()用
@@ -150,6 +151,7 @@ const fetchAIResponse = (userMsg) =>{
   // 【新增-对话记忆】在发请求前，先取出当前完整的历史对话
   // 注意：此时 messages.value 里已经包含了用户刚发出的这一条（因为 sendMessage 里先调 addUserMessage 再调 fetchAIResponse）
   // 但还包含上面刚 push 的空 AI 占位消息，buildHistory 里的 filter 会把它过滤掉
+  //经过buildHistory()方法处理以后，只剩下role和content两个字段
   const history = buildHistory()
 
   //调用axios的fetchStream函数
@@ -187,6 +189,7 @@ const fetchAIResponse = (userMsg) =>{
     //例子：let arr = [{name:'张三'}, {name:'李四'}]
     //     let x   = arr[0]    // 赋值：把 arr[0] 的值 给 x
     //相当于把messages.value[messages.value.length -1]的地址赋值给lastMsg
+    //找到那个空的 AI 占位消息 ，把 AI 逐字返回的内容塞进去。
     const lastMsg= messages.value[messages.value.length -1]
     if(lastMsg && lastMsg.role ==='ai'){
 //messages.value = [

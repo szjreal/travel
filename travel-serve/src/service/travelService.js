@@ -6,7 +6,8 @@
 import { ChatOpenAI } from "@langchain/openai";
 // 【修改-对话记忆】新增 AIMessage：LangChain 用 HumanMessage 表示用户说的话，AIMessage 表示 AI 之前回复的话
 // 区分这两种类型，大模型才能正确理解对话的"角色交替"顺序，实现上下文记忆
-import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
+import { HumanMessage, SystemMessage, AIMessage ,ToolMessage } from "@langchain/core/messages";
+import { tools } from "./tools.js";
 import "dotenv/config";
 //class TravelService {
 //    constructor(){
@@ -102,7 +103,7 @@ class TravelService {
                 // 形式3: 内容里被转义，换行变成 \n、引号变成 \"
 
                 // 第一步：尝试去掉 markdown 代码块（如果有）
-                // 正则说明：匹配 ``` 或 ```json 开头的代码块，中间的 [\s\S]*? 是非贪婪匹配任意字符（包括换行）
+                // 正则匹配：匹配 ``` 或 ```json 开头的代码块，中间的 [\s\S]*? 是非贪婪匹配任意字符（包括换行）
                 const codeBlockMatch = fullResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
                 let jsonStr = codeBlockMatch ? codeBlockMatch[1] : fullResponse;
 
@@ -205,7 +206,7 @@ class TravelService {
     async chat(message, history, streamCallback){
         //组装参数：System(设定角色) + 历史对话 + 当前用户消息
         const messages =[
-            new SystemMessage('你是一个友好专业的旅游规划师，用中文回答用户的问题'),
+            new SystemMessage('你是一个友好专业的旅游规划师，可以调用工具获取实时信息，用中文回答用户的问题'),
         ];
 
         // 【新增-对话记忆】把历史对话按角色转换成 LangChain 的消息对象
@@ -233,6 +234,155 @@ class TravelService {
 //     HumanMessage('北京有哪些景点？'),   // ← 来自本轮 message
 // ]并传给const stream = await this.llm.stream(messages);
 //                            ↑ 就下上面那个数组
+
+
+
+
+
+
+
+        // ===== 智能体：先静默循环调工具（最多5次），前端这几秒在转圈 =====
+      //bindTools(tools) 等于复制了一个"带工具箱的大模型"
+      //llmWithTools：回答前可以先决定"我要不要调工具"
+        const llmWithTools = this.llm.bindTools(tools);
+        for (let i = 0; i < 5; i++) {
+            //this.llm.invoke(messages)长这样
+            //{
+//   "model": "deepseek-chat",
+//   "messages": [
+//     { "role": "system", "content": "你是旅游规划师" },
+//     { "role": "user", "content": "北京天气怎么样" }
+//   ]
+// }
+
+             //llmWithTools.invoke(messages)加了tools， DeepSeek 看到后多了一个选择
+             //{
+//   "model": "deepseek-chat",
+//   "messages": [
+//     { "role": "system", "content": "你是旅游规划师" },
+//     { "role": "user", "content": "北京天气怎么样" }
+//   ],
+//   "tools": [
+//     {
+//       "type": "function",
+//       "function": {
+//         "name": "get_weather",
+//         "description": "查询某个城市的天气",
+//         "parameters": {
+//           "type": "object",
+//           "properties": {
+//             "city": { "type": "string", "description": "城市名" }
+//           }
+//         }
+//       }
+//     }
+//   ]
+// }
+            const toolResponse = await llmWithTools.invoke(messages);
+            //情况A，用户问北京有哪些景点，故宫门票多少，ai决定调用工具
+//toolResponse = {
+  // content 是空的，因为AI还没打算直接回答用户
+//   content: "",
+
+//   // tool_calls 不为空 → AI 想调工具
+//   tool_calls: [
+//     {
+//       name: "get_weather",          // 调哪个工具
+//       args: { city: "北京" },        // AI 从用户问题里提取的参数
+//       id: "call_abc123"              // 这次调用的编号（配对用的）
+//     },
+//     {
+//       name: "get_spot_ticket",
+//       args: { spot: "故宫" },
+//       id: "call_def456"
+//     }
+//   ],
+
+//   // 下面是 LangChain 内部字段，你不用管
+//   response_metadata: { finish_reason: "tool_calls" },
+//   usage_metadata: { input_tokens: 50, output_tokens: 20 },
+//   id: "chatcmpl-xxx"
+// }
+
+//情况B，用户问：你好，ai决定不调用工具
+//toolResponse = {
+  // 有内容 → AI 直接回答了
+//   content: "你好！我是旅游规划师，有什么可以帮你的？",
+
+//   // 空数组 → AI 不想调工具
+//   tool_calls: [],
+
+//   response_metadata: { finish_reason: "stop" },
+//   usage_metadata: { input_tokens: 10, output_tokens: 15 },
+//   id: "chatcmpl-yyy"
+// }
+
+
+            // AI 没要求调工具 → 跳出循环，继续走下面原有的流式输出
+            if (!toolResponse.tool_calls || toolResponse.tool_calls.length === 0) {
+                break;
+            }
+
+            messages.push(toolResponse);
+
+            // 执行 AI 要求调用的每个工具，结果塞回消息
+            //find() 是 JS 数组方法，按条件找第一个匹配的元素
+            for (const toolCall of toolResponse.tool_calls) {
+                //find() 是 JS 数组方法，按条件找第一个匹配的元素，
+                //找到对应的工具
+                const tool = tools.find(t => t.name === toolCall.name);
+                const toolResult = await tool.invoke(toolCall.args);
+                messages.push(new ToolMessage({
+                    content: toolResult,
+                    tool_call_id: toolCall.id,
+                }));
+            }
+        }
+// messages长这样
+//messages = [
+    // ① 原有的
+//     new SystemMessage('你是一个友好专业的旅游规划师，可以调用工具获取实时信息...'),
+
+//     // ② 历史对话（假设有）
+//     new HumanMessage('之前聊过的内容...'),
+
+//     // ③ 本轮用户问题
+//     new HumanMessage('北京天气怎么样？故宫门票多少？'),
+
+//     // ④ AI 的工具调用决定（L326 push 进来的 toolResponse）
+//     //    content 是空的，因为 AI 还没回答，只是说"我要调工具"
+//     new AIMessage({
+//         content: "",
+//         tool_calls: [
+//             { name: "get_weather",      args: { city: "北京" }, id: "call_abc123" },
+//             { name: "get_spot_ticket",  args: { spot: "故宫" }, id: "call_def456" }
+//         ]
+//     }),
+
+//     // ⑤ 第 1 个工具的结果（L335-338 push 的 ToolMessage）
+//     new ToolMessage({
+//         content: "北京今天晴，25°C，微风",    // get_weather 的返回
+//         tool_call_id: "call_abc123",          // 和上面 tool_calls[0].id 配对
+//     }),
+
+//     // ⑥ 第 2 个工具的结果
+//     new ToolMessage({
+//         content: "故宫门票60元，学生半价",       // get_spot_ticket 的返回
+//         tool_call_id: "call_def456",          // 和上面 tool_calls[1].id 配对
+//     }),
+// ]
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -315,6 +465,7 @@ let fullResponse = '';
         };
        }
     }
+
 }
 
 export default new TravelService();

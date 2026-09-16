@@ -113,6 +113,7 @@ try{
 // }
 //reader.read() 是浏览器原生 ReadableStreamDefaultReader 的方法
 //done由后端travel.js 中的stream.end();控制
+//stream是由streamUtils.js控制的
     const {done,value} = await reader.read()
     if(done){
       break
@@ -145,7 +146,9 @@ try{
     
     
             //3. 解析流式响应数据
-//SSE 协议中，每条消息以 \n 分隔，filter(line=>line.trim()) 过滤掉空行
+//大模型连续吐字快的时候，可能一行有多个数据，
+//例如'data: {"type":"chunk","content":"北"}\n\ndata: {"type":"chunk","content":"京"}\n\n' 
+//需要根据\n分隔
     const lines = chunk.split('\n').filter(line=>line.trim())
 //遍历每一行数据
     for(const line of lines){
@@ -158,10 +161,11 @@ try{
 
 
       //4. 去前缀 + 解析 JSON 字符串
-      // 跳过 SSE 的心跳/结束标记（如 data: end 或 end）
+      //有些行是结束标记，要跳过
       if(line.trim() === 'data: end' || line.trim() === 'end'){
         continue
       }
+    //   把 SSE 格式变成能用的 JS 对象
      try{
         // 去掉 'data:' 前缀（兼容后面有空格或没有空格的情况）
         const jsonstr = line.replace(/^data:\s*/, '').trim()

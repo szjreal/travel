@@ -104,13 +104,9 @@ const result = await travelService.chat(message, history, (chunk)=>{
    //第 3 步：res.write(...) 写入 HTTP 响应流
 //res.write 不会关连接，可以一直写、一直写……直到 res.end() 才关。   
 });
-//前端不接受，废代码
-stream.send({type:'complete',data:result});
-//上方全都执行完毕，执行streamUtils.js里的end
-//streamUtils.js里的end方法会写入end\ndata:{"done":"true"}\n\n到响应体
-//被后端的request拿到数据
 stream.end();
 
 })
+
 //导出路由模块
 export default router;
