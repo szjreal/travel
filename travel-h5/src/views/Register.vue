@@ -2,12 +2,19 @@
   <div class="register-container">
     <!-- 左侧品牌展示区（CSS @media 控制手机端隐藏） -->
     <div class="brand-side">
+      <!-- 装饰性光斑 -->
+      <span class="blob blob-1"></span>
+      <span class="blob blob-2"></span>
+      <span class="blob blob-3"></span>
+
       <div class="brand-content">
         <div class="brand-logo">
-          <el-icon :size="40" color="#fff"><Suitcase /></el-icon>
+          <div class="logo-badge">
+            <el-icon :size="30" color="#fff"><Suitcase /></el-icon>
+          </div>
           <h1 class="brand-title">智能旅游助手</h1>
         </div>
-        <p class="brand-slogan">加入我们，开启智能旅行</p>
+        <p class="brand-slogan">加入我们，开启一场由 AI 定制的智能旅行</p>
         <div class="brand-features">
           <div class="feature-item" v-for="f in features" :key="f.text">
             <span class="feature-icon">{{ f.icon }}</span>
@@ -20,6 +27,14 @@
     <!-- 右侧注册表单区 -->
     <div class="form-side">
       <div class="form-content">
+        <!-- 手机端顶部品牌标识 -->
+        <div class="mobile-brand">
+          <div class="logo-badge logo-badge--sm">
+            <el-icon :size="24" color="#fff"><Suitcase /></el-icon>
+          </div>
+          <span class="mobile-brand-name">智能旅游助手</span>
+        </div>
+
         <h2 class="form-title">创建账号</h2>
         <p class="form-subtitle">注册后即可享受智能旅游服务</p>
 
@@ -200,49 +215,121 @@ const handleRegister = async () => {
 
 /* 左侧品牌区 */
 .brand-side {
-  flex: 1;
-  background: linear-gradient(135deg, #409eff 0%, #36cbcb 100%);
+  position: relative;
+  flex: 1.1;
+  overflow: hidden;
+  background: linear-gradient(135deg, #4776e6 0%, #409eff 45%, #36cbcb 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
 }
 
+/* 装饰光斑 */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(8px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.blob-1 {
+  width: 360px;
+  height: 360px;
+  top: -120px;
+  right: -80px;
+  background: radial-gradient(circle at 30% 30%, #ffffff, transparent 70%);
+  animation: float 9s ease-in-out infinite;
+}
+.blob-2 {
+  width: 260px;
+  height: 260px;
+  bottom: -90px;
+  left: -60px;
+  background: radial-gradient(circle at 30% 30%, #b3e5ff, transparent 70%);
+  animation: float 11s ease-in-out infinite reverse;
+}
+.blob-3 {
+  width: 180px;
+  height: 180px;
+  top: 40%;
+  left: 20%;
+  background: radial-gradient(circle at 30% 30%, #7ef0e0, transparent 70%);
+  animation: float 13s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-26px) translateX(14px); }
+}
+
 .brand-content {
-  max-width: 360px;
+  position: relative;
+  z-index: 1;
+  max-width: 380px;
   padding: 40px;
 }
 
 .brand-logo {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.logo-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.logo-badge--sm {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
 }
 
 .brand-title {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 1px;
   margin: 0;
 }
 
 .brand-slogan {
   font-size: 16px;
-  opacity: 0.85;
-  margin-bottom: 40px;
+  line-height: 1.7;
+  opacity: 0.92;
+  margin-bottom: 44px;
 }
 
 .brand-features {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .feature-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   font-size: 15px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  transition: transform 0.25s ease, background 0.25s ease;
+}
+.feature-item:hover {
+  transform: translateX(6px);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .feature-icon {
@@ -262,11 +349,34 @@ const handleRegister = async () => {
   width: 100%;
   max-width: 380px;
   padding: 40px;
+  animation: rise 0.5s ease both;
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 手机端顶部品牌标识（桌面端隐藏） */
+.mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.mobile-brand .logo-badge {
+  background: linear-gradient(135deg, #409eff, #36cbcb);
+  border: none;
+}
+.mobile-brand-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #303133;
 }
 
 .form-title {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
   color: #303133;
   margin: 0 0 8px;
 }
@@ -279,13 +389,33 @@ const handleRegister = async () => {
 
 .register-btn {
   width: 100%;
+  height: 46px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  border: none;
+  background: linear-gradient(135deg, #409eff 0%, #36cbcb 100%);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.register-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgba(64, 158, 255, 0.35);
 }
 
 .form-footer {
   text-align: center;
-  margin-top: 20px;
+  margin-top: 24px;
   font-size: 14px;
   color: #909399;
+}
+
+/* 输入框圆角微调 */
+.form-content :deep(.el-input__wrapper) {
+  border-radius: 10px;
+  padding: 4px 12px;
+}
+.form-content :deep(.el-form-item) {
+  margin-bottom: 22px;
 }
 
 /* 响应式：手机端隐藏品牌区，表单区全屏 */
@@ -295,9 +425,16 @@ const handleRegister = async () => {
   }
   .register-container {
     flex-direction: column;
+    background: #fff;
   }
   .form-side {
     flex: 1;
+  }
+  .mobile-brand {
+    display: flex;
+  }
+  .form-content {
+    padding: 32px 24px;
   }
 }
 </style>
