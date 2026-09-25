@@ -39,3 +39,25 @@ desktop.ini
 *.tmp
 *.bak
 .cache/
+
+# JiuwenSwarm runtime file operation logs
+.agent_history/
+
+# ===== Trae/Agent 工具生成的文件（非项目代码，不上传） =====
+.office-claw/
+agents/
+coding_memory/
+context/
+docs/
+memory/
+messages/
+mockup/
+prompt_attachment/
+skills/
+todo/
+AGENT.md
+BACKLOG.md
+HEARTBEAT.md
+IDENTITY.md
+SOUL.md
+USER.md

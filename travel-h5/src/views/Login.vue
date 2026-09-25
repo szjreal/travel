@@ -1,47 +1,75 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <van-nav-bar title="登录" left-arrow left-text="返回" @click-left="onBack" />
-    </div>
-    <div class="page-content">
-      <div class="login-logo">
-        <van-icon name="user-circle-o" size="64px" color="#1989fa" />
-        <h2 class="login-title">智能旅游助手</h2>
-        <p class="login-subtitle">欢迎回来，请登录您的账号</p>
+  <div class="login-container">
+    <!-- 左侧品牌展示区（CSS @media 控制手机端隐藏） -->
+    <div class="brand-side">
+      <div class="brand-content">
+        <div class="brand-logo">
+          <el-icon :size="40" color="#fff"><Suitcase /></el-icon>
+          <h1 class="brand-title">智能旅游助手</h1>
+        </div>
+        <p class="brand-slogan">让 AI 帮你规划每一次旅行</p>
+        <div class="brand-features">
+          <div class="feature-item" v-for="f in features" :key="f.text">
+            <span class="feature-icon">{{ f.icon }}</span>
+            <span class="feature-text">{{ f.text }}</span>
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="card login-form">
-        <van-field
-          v-model="formData.username"
-          label="用户名"
-          placeholder="请输入用户名"
-          clearable
-          :border="false"
-          style="margin-bottom: 12px; border-radius: 8px; background-color: #f7f8fa;"
-        />
-        <van-field
-          v-model="formData.password"
-          label="密码"
-          placeholder="请输入密码"
-          type="password"
-          clearable
-          @keyup.enter="handleLogin"
-          :border="false"
-          style="margin-bottom: 16px; border-radius: 8px; background-color: #f7f8fa;"
-        />
-        <van-button
+    <!-- 右侧登录表单区 -->
+    <div class="form-side">
+      <div class="form-content">
+        <h2 class="form-title">欢迎回来</h2>
+        <p class="form-subtitle">请登录您的账号</p>
+
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="rules"
           size="large"
-          round
-          type="primary"
-          :loading="isLoading"
-          @click="handleLogin"
+          @submit.prevent="handleLogin"
         >
-          登录
-        </van-button>
+          <el-form-item prop="username">
+            <el-input
+              v-model="formData.username"
+              placeholder="请输入用户名"
+              :prefix-icon="User"
+              clearable
+            />
+          </el-form-item>
 
-        <div class="login-footer">
-          还没有账号？
-          <span class="link" @click="goRegister">立即注册</span>
+          <el-form-item prop="password">
+            <el-input
+              v-model="formData.password"
+              type="password"
+              placeholder="请输入密码"
+              :prefix-icon="Lock"
+              show-password
+              clearable
+              @keyup.enter="handleLogin"
+            />
+          </el-form-item>
+
+          <div class="form-options">
+            <el-checkbox v-model="formData.remember">记住我</el-checkbox>
+            <el-link type="primary" :underline="false">忘记密码？</el-link>
+          </div>
+
+          <el-button
+            type="primary"
+            size="large"
+            :loading="isLoading"
+            class="login-btn"
+            @click="handleLogin"
+          >
+            登录
+          </el-button>
+        </el-form>
+
+        <div class="form-footer">
+          还没账号？
+          <el-link type="primary" :underline="false" @click="goRegister">立即注册</el-link>
         </div>
       </div>
     </div>
@@ -49,116 +77,193 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
-
-import { showToast } from 'vant'
-import { post } from '@/untils/authRequest.js'
+import { ref, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { User, Lock, Suitcase } from '@element-plus/icons-vue'
+import { post } from '@/untils/authRequest.js'
+
 const router = useRouter()
 const route = useRoute()
 
-// 表单数据
+const features = [
+  { icon: '✨', text: 'AI 智能行程规划' },
+  { icon: '🗺️', text: '场景化专家推荐' },
+  { icon: '💰', text: '预算可视化分析' },
+]
+
+const formRef = ref(null)
 const formData = reactive({
   username: '',
-  password: ''
+  password: '',
+  remember: false,
 })
 const isLoading = ref(false)
 
-// 返回上一页
-const onBack = () => {
-  router.back()
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
+  ],
 }
 
-// 跳注册页
 const goRegister = () => {
   router.push('/register')
 }
 
-// 登录
 const handleLogin = async () => {
-  // 1. 校验
-  //双向绑定
-  if (!formData.username) {
-    showToast('请输入用户名')
-    return
-  }
-  if (!formData.password) {
-    showToast('请输入密码')
-    return
-  }
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
 
-  // 2. 调接口
-  //登录button的loading状态处理
-  isLoading.value = true
-  try {
-  //调用export function post(url, data) {
-  // return authRequest.post(url, data)
-  // }
-    const res = await post('/auth/login', {
-      username: formData.username,
-      password: formData.password
-    })
+    isLoading.value = true
+    try {
+      const res = await post('/auth/login', {
+        username: formData.username,
+        password: formData.password,
+      })
 
-   if (res.code === 0) {
-  // 登录成功：存 token 和 user
-  // setItem存  getItem 取  removeItem删
-localStorage.setItem('token', res.token)
-//变成json字符串
-  localStorage.setItem('user', JSON.stringify(res.user))
- showToast('登录成功')
-// 判断是否要跳回原页面
-//很重要
-//第一种情况，如果在profile页面点击去登陆，直接跳转到http://localhost:5173/login，然后输入用户名和密码以后点击登录，经过路由守卫，虽然没有token，但也没有to.meta.needLogin，于是放行，于是就没有 route.query.redirect，于是跳回/profile。
-//第二种情况，直接输入http://localhost:5173/favorites，经过路由守卫，符合to.meta.needLogin && !token，于是组合成/login?redirect=/favorites，经过const redirect = route.query.redirect
-//if (redirect) {
- // router.push(redirect)  ，就返回/favorites
-const redirect = route.query.redirect
-if (redirect) {
-  router.push(redirect)      // 跳回登录前想去的页面
-} else {
-  router.push('/profile')   // 没指定就跳个人页
-}
-}else {
-      showToast(res.msg)
+      if (res.code === 0) {
+        localStorage.setItem('token', res.token)
+        localStorage.setItem('user', JSON.stringify(res.user))
+
+        ElMessage.success('登录成功')
+
+        const redirect = route.query.redirect
+        if (redirect) {
+          router.push(redirect)
+        } else {
+          router.push('/dashboard')
+        }
+      } else {
+        ElMessage.error(res.msg || '登录失败')
+      }
+    } catch (err) {
+      ElMessage.error('网络错误，请稍后重试')
+    } finally {
+      isLoading.value = false
     }
-  } catch (err) {
-    showToast('网络错误，请稍后重试')
-  } finally {
-    isLoading.value = false
-  }
+  })
 }
 </script>
 
 <style scoped>
-.login-logo {
-  text-align: center;
-  padding: 40px 0 20px;
+.login-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f0f2f5;
 }
 
-.login-title {
-  font-size: 22px;
-  color: #323233;
-  margin: 12px 0 6px;
+/* 左侧品牌区 */
+.brand-side {
+  flex: 1;
+  background: linear-gradient(135deg, #409eff 0%, #36cbcb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
 
-.login-subtitle {
+.brand-content {
+  max-width: 360px;
+  padding: 40px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.brand-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.brand-slogan {
+  font-size: 16px;
+  opacity: 0.85;
+  margin-bottom: 40px;
+}
+
+.brand-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+}
+
+.feature-icon {
+  font-size: 20px;
+}
+
+/* 右侧表单区 */
+.form-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.form-content {
+  width: 100%;
+  max-width: 380px;
+  padding: 40px;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #303133;
+  margin: 0 0 8px;
+}
+
+.form-subtitle {
   font-size: 14px;
-  color: #969799;
+  color: #909399;
+  margin: 0 0 32px;
 }
 
-.login-form {
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.login-btn {
+  width: 100%;
+}
+
+.form-footer {
+  text-align: center;
   margin-top: 20px;
-}
-
-.login-footer {
-  text-align: center;
-  margin-top: 16px;
   font-size: 14px;
-  color: #969799;
+  color: #909399;
 }
 
-.link {
-  color: #1989fa;
-  margin-left: 4px;
+/* 响应式：手机端隐藏品牌区，表单区全屏 */
+@media (max-width: 768px) {
+  .brand-side {
+    display: none;
+  }
+  .login-container {
+    flex-direction: column;
+  }
+  .form-side {
+    flex: 1;
+  }
 }
 </style>

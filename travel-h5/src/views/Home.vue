@@ -140,7 +140,7 @@ const cityColumns =allCities.value.map(item=>({
 // 处理选择确认
 // handleCityConfirm = ({ 里面可以放三个参数：selectedIndex, selectedOptions(里面是数组),selectedValues  })
 const handleCityConfirm = ({ selectedValues }) => {
-  formData.city = selectedValues[0]
+  formData.city  = selectedValues[0]
   showCityPicker.value = false
 }
 
@@ -152,7 +152,7 @@ const formData = reactive({
 const isLoading = ref(false)
 // 提交表单
 const handleSubmit = async () => {
-  isLoading.value = true
+ 
   //判断目的地
   if(!formData.city){
    showToast('请选择目的地')
@@ -168,6 +168,7 @@ const handleSubmit = async () => {
    showToast('请输入行程天数，不能小于1天或大于30天')
    return
   }
+   isLoading.value = true
   //很重要，可以让url携带数据，方便在detail.vue中接收
   router.push({
     path:'/detail',

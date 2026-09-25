@@ -1,19 +1,14 @@
 <template>
   <div class="budget-table">
-    <van-cell-group :border="false">
-      <!-- 遍历对象 -->
-       <!-- value:1200  key:'accommodation' -->
-        <!-- budgetItems是一个对象 -->
-         <!-- getLabel 函数把英文 key 翻译成中文： -->
-          <!-- getLabel('accommodation') → '住宿' -->
-      <van-cell
+    <el-descriptions :column="1" border>
+      <el-descriptions-item
         v-for="(value, key) in budgetItems"
         :key="key"
-        :title="getLabel(key)"
-        :value="`¥${value}`"
-        :border="false"
-      />
-    </van-cell-group>
+        :label="getLabel(key)"
+      >
+        <span class="budget-value">¥{{ value }}</span>
+      </el-descriptions-item>
+    </el-descriptions>
     <div class="budget-total">
       <span>总计</span>
       <span class="total-amount">¥{{ total }}</span>
@@ -59,24 +54,18 @@ const getLabel = (key) => {
 </script>
 
 <style scoped>
-.budget-table {
-  margin-top: 8px;
-}
-
+.budget-table { margin-top: 8px; }
+.budget-value { font-weight: 500; }
 .budget-total {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  background: #f7f8fa;
+  background: #f5f7fa;
   border-radius: 8px;
   margin-top: 8px;
   font-size: 16px;
   font-weight: 600;
 }
-
-.total-amount {
-  color: #ee0a24;
-  font-size: 18px;
-}
+.total-amount { color: #f56c6c; font-size: 18px; }
 </style>

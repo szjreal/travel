@@ -1,409 +1,423 @@
 <template>
-  <div class="profile-container">
-    <van-nav-bar 
-      title="我的" 
-      left-text="" 
-      :left-arrow="true"
-      @click-left="goBack"
-    />
-    
-    <!-- 用户信息区域 -->
-    <div class="user-info">
-      
+  <div class="profile-page">
+    <!-- 用户信息卡片 -->
+    <el-card class="user-card" shadow="hover">
+      <div class="user-header">
+        <div class="avatar-wrap" @click="triggerAvatarInput">
+          <el-avatar :size="80" :src="userAvatar || undefined" class="user-avatar">
+            {{ userName.charAt(0) }}
+          </el-avatar>
+          <div class="avatar-overlay">更换</div>
+        </div>
+        <input type="file" ref="avatarInput" accept="image/*" style="display:none" @change="handleAvatarChange" />
 
-<div
-  title="点击更换头像"
-  style="cursor: pointer"
-  @click="triggerAvatarInput"
->
-  <van-image :src="userAvatar" round class="avatar" />
-</div>
+        <div class="user-meta">
+          <h2 class="user-name">{{ userName }}</h2>
+          <p class="user-desc">{{ userDesc }}</p>
+          <p class="user-contact" v-if="userEmail || userPhone">
+            <span v-if="userEmail">📧 {{ userEmail }}</span>
+            <span v-if="userPhone">📱 {{ userPhone }}</span>
+          </p>
+          <p class="user-date">注册时间: {{ registerDate }}</p>
+        </div>
 
-<!-- 任何 <input type="file"> 元素被点击时，浏览器就会调用操作系统的文件选择对话框。 -->
-<input
-  type="file"
-  ref="avatarInput"
-  accept="image/*"
-  style="display: none"
-  @change="handleAvatarChange"
-/>
-
-      <div class="user-details">
-        <h2 class="user-name">{{ userName }}</h2>
-        <p class="user-desc">欢迎使用智能旅游助手</p>
+        <div class="user-stats">
+          <el-statistic title="总行程" :value="stats.totalTrips" />
+          <el-statistic title="收藏数" :value="stats.favorites" />
+          <el-statistic title="对话数" :value="stats.chats" />
+        </div>
       </div>
-    </div>
-    
-    <!-- 功能菜单 -->
-    <div class="menu-section">
-      <h3 class="menu-title">我的服务</h3>
-      <van-cell-group>
-        <van-cell
-          :title="isLoggedIn ? '我的收藏' : '我的收藏'"
-          is-link
-          :icon="isLoggedIn ? 'star-o' : 'lock'"
-          :class="{ 'disabled-cell': !isLoggedIn }"
-          @click="handleFavoriteClick"
-        />
-        <van-cell
-          title="修改昵称"
-          is-link
-          :icon="isLoggedIn ? 'edit' : 'lock'"
-          :class="{ 'disabled-cell': !isLoggedIn }"
-          @click="handleNicknameClick"
-        />
-      </van-cell-group>
-    </div>
-    
-    <!-- 关于我们 -->
-    <div class="menu-section">
-      <h3 class="menu-title">关于</h3>
-      <van-cell-group>
-        <van-cell 
-          title="关于我们" 
-          is-link 
-          @click="showAboutDialog"
-        />
-        <van-cell 
-          title="版本信息" 
-          value="v1.0.0"
-        />
-      </van-cell-group>
-    </div>
-    
-    <!-- 关于我们对话框 -->
-    <van-dialog 
-      v-model:show="aboutDialogVisible" 
-      title="关于我们"
-      show-cancel-button
-    >
-      <div class="about-content">
-        <p>智能旅游助手 v1.0.0</p>
-        <p class="mt-2">基于 AI 技术的智能旅游规划平台</p>
-        <p class="mt-2">为您提供个性化的旅游行程推荐和实时旅游咨询服务</p>
-        <p class="mt-4 text-center">© 2026 智能旅游助手</p>
-      </div>
-    </van-dialog>
+    </el-card>
 
-    <!-- 修改昵称弹窗 -->
-    <!-- nicknameDialogVisible控制弹窗显示/隐藏，true=显示，false=隐藏 -->
-    <van-dialog
-      v-model:show="nicknameDialogVisible"
-      title="修改昵称"
-      show-cancel-button
-      :before-close="onNicknameConfirm"
-    >
-      <div style="padding: 16px;">
-        <van-field
-          v-model="nicknameInput"
-          placeholder="请输入新昵称（2-20个字符）"
-          clearable
-          maxlength="20"
-          style="background-color: #f7f8fa; border-radius: 8px;"
-        />
-      </div>
-    </van-dialog>
+    <!-- Tab 布局 -->
+    <el-card class="tab-card" shadow="never">
+      <el-tabs v-model="activeTab">
+        <!-- Tab1: 基本信息 -->
+        <el-tab-pane label="基本信息" name="info">
+          <el-form :model="profileForm" label-width="80px" style="max-width: 500px">
+            <el-form-item label="昵称">
+              <el-input v-model="profileForm.nickname" placeholder="请输入昵称" />
+            </el-form-item>
+            <el-form-item label="邮箱">
+              <el-input v-model="profileForm.email" placeholder="请输入邮箱" />
+            </el-form-item>
+            <el-form-item label="手机号">
+              <el-input v-model="profileForm.phone" placeholder="请输入手机号" />
+            </el-form-item>
+            <el-form-item label="个人简介">
+              <el-input
+                v-model="profileForm.bio"
+                type="textarea"
+                :rows="3"
+                placeholder="介绍一下自己吧"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="savingProfile" @click="saveProfile">
+                保存修改
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
 
-    <!-- 退出登录 -->
-<div class="menu-section" v-if="isLoggedIn">
-  <van-cell-group>
-    <van-cell 
-      title="退出登录" 
-      is-link 
-      icon="cross"
-      @click="handleLogout"
-    />
-  </van-cell-group>
-</div>
+        <!-- Tab2: 账号安全 -->
+        <el-tab-pane label="账号安全" name="security">
+          <el-form :model="passwordForm" :rules="passwordRules" ref="passwordFormRef" label-width="100px" style="max-width: 500px">
+            <el-form-item label="当前密码" prop="oldPassword">
+              <el-input v-model="passwordForm.oldPassword" type="password" show-password placeholder="请输入当前密码" />
+            </el-form-item>
+            <el-form-item label="新密码" prop="newPassword">
+              <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="请输入新密码" />
+            </el-form-item>
+            <el-form-item label="确认新密码" prop="confirmPassword">
+              <el-input v-model="passwordForm.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="savingPassword" @click="changePassword">
+                修改密码
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
 
-<!-- 未登录时显示登录按钮 -->
-<div class="menu-section" v-else>
-  <van-cell-group>
-    <van-cell 
-      title="去登录" 
-      is-link 
-      icon="user-o"
-      @click="goLogin"
-    />
-  </van-cell-group>
-</div>
+
+      </el-tabs>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref ,onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
-import { get, post } from '@/untils/authRequest.js'   
-const router = useRouter()
-const avatarInput = ref(null)   // 绑定隐藏的 input 元素
-// 用户信息
-const userAvatar = ref('https://img.yzcdn.cn/vant/cat.jpeg')
-const userName = ref('游客')
-const isLoggedIn = ref(false)   // 新增：是否已登录
-// 对话框状态
-const aboutDialogVisible = ref(false)
-// 修改昵称弹窗状态
-const nicknameDialogVisible = ref(false)
-const nicknameInput = ref('')
+import { ElMessage } from 'element-plus'
+import { get, post } from '@/untils/authRequest.js'
 
-// 显示关于我们对话框
-const showAboutDialog = () => {
-  aboutDialogVisible.value = true
+const router = useRouter()
+const avatarInput = ref(null)
+
+// 用户信息
+const userAvatar = ref('')
+const userName = ref('游客')
+const userDesc = ref('欢迎使用智能旅游助手')
+const userEmail = ref('')
+const userPhone = ref('')
+const registerDate = ref('—')
+const isLoggedIn = ref(false)
+
+// Tab 状态
+const activeTab = ref('info')
+
+// 统计数据（初始值归零，onMounted 里从接口拉）
+const stats = reactive({
+  totalTrips: 0,
+  favorites: 0,
+  chats: 0,
+})
+
+// 基本信息表单
+const profileForm = reactive({
+  nickname: '',
+  email: '',
+  phone: '',
+  bio: '',
+})
+const savingProfile = ref(false)
+
+// 密码表单
+const passwordFormRef = ref(null)
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+})
+const savingPassword = ref(false)
+
+const validateConfirmPassword = (rule, value, callback) => {
+  if (value !== passwordForm.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
 }
 
+const passwordRules = {
+  oldPassword: [
+    { required: true, message: '请输入当前密码', trigger: 'blur' },
+  ],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '新密码至少 6 位', trigger: 'blur' },
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' },
+  ],
+}
+
+// onMounted: 获取用户信息 + 统计数据
 onMounted(async () => {
   const token = localStorage.getItem('token')
-  
-  // 1. 没 token → 未登录状态，什么都不做
+
   if (!token) {
     isLoggedIn.value = false
     return
   }
-  
-  // 2. 有 token → 先从 localStorage 读用户信息立即显示
+
+  isLoggedIn.value = true
+
+  // 先从 localStorage 读用户信息立即显示
   const userStr = localStorage.getItem('user')
   if (userStr) {
     const user = JSON.parse(userStr)
-    // 优先显示昵称，没有昵称才显示用户名
     userName.value = user.nickname || user.username
-    userAvatar.value = user.avatar
-    isLoggedIn.value = true
+    userAvatar.value = user.avatar || ''
+    profileForm.nickname = user.nickname || user.username || ''
+    profileForm.email = user.email || ''
+    profileForm.phone = user.phone || ''
+    profileForm.bio = user.bio || ''
   }
-  
-  // 3. 有第二步保底，调接口拉最新数据覆盖第二步的用户信息
+
+  // 并行拉用户详情 + 统计数据
   try {
-    const res = await get('/auth/user')
-    if (res.code === 0) {
-      // 优先显示昵称，没有昵称才显示用户名
-      userName.value = res.user.nickname || res.user.username
-      userAvatar.value = res.user.avatar
-      // 更新 localStorage
-      localStorage.setItem('user', JSON.stringify(res.user))
+    const [userRes, statsRes] = await Promise.allSettled([
+      get('/auth/user'),
+      get('/travel/stats'),
+    ])
+
+    // 用户详情
+    if (userRes.status === 'fulfilled' && userRes.value?.code === 0) {
+      const u = userRes.value.user
+      userName.value = u.nickname || u.username || userName.value
+      userAvatar.value = u.avatar || ''
+      userDesc.value = u.bio || '欢迎使用智能旅游助手'
+      userEmail.value = u.email || ''
+      userPhone.value = u.phone || ''
+      registerDate.value = u.created_at
+        ? new Date(u.created_at).toLocaleDateString('zh-CN')
+        : '—'
+      localStorage.setItem('user', JSON.stringify(u))
+      profileForm.nickname = u.nickname || u.username || ''
+      profileForm.email = u.email || ''
+      profileForm.phone = u.phone || ''
+      profileForm.bio = u.bio || ''
+    }
+
+    // 统计数据
+    if (statsRes.status === 'fulfilled' && statsRes.value?.code === 0) {
+      const d = statsRes.value.data
+      stats.chats = d.chatCount || 0
+      stats.favorites = d.favoriteCount || 0
+      stats.totalTrips = d.chatCount || 0  // 用对话数近似总行程
     }
   } catch (err) {
-    // 401 错误会被 authRequest.js 的响应拦截器自动处理（清 token + 跳登录页）
-    console.log('获取用户信息失败', err)
+    console.log('获取 Profile 数据失败', err)
   }
 })
 
-const handleLogout = () => {
-  // 清掉 localStorage
-  localStorage.removeItem('token')
-  localStorage.removeItem('user')
-  // 重置页面状态
-  userName.value = '游客'
-  userAvatar.value = 'https://img.yzcdn.cn/vant/cat.jpeg'
-  isLoggedIn.value = false
-  showToast('已退出登录')
-}
-
-// 返回上一页
-const goBack = () => {
-  router.back()
-}
-
-
-
-// 去登录页
-const goLogin = () => {
-  router.push('/login')
-}
-
-// 我的收藏
-const handleFavoriteClick = () => {
-  if (!isLoggedIn.value) {
-    showToast('请先登录后查看')
-    router.push('/login')
+// 保存基本信息
+const saveProfile = async () => {
+  if (!profileForm.nickname.trim()) {
+    ElMessage.warning('昵称不能为空')
     return
   }
-  router.push('/favorites')
-}
-
-// 修改昵称
-const handleNicknameClick = () => {
-  if (!isLoggedIn.value) {
-    showToast('请先登录后操作')
-    router.push('/login')
+  if (profileForm.nickname.trim().length < 2 || profileForm.nickname.trim().length > 20) {
+    ElMessage.warning('昵称长度需在 2-20 个字符之间')
     return
   }
-  // 打开弹窗时，把当前昵称（或用户名）填进去方便修改
-  //|| 的规则：从左到右找第一个有值的，找到就停。
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
-  nicknameInput.value = user.nickname || user.username || ''
-  nicknameDialogVisible.value = true
-}
 
-// 确认修改昵称（before-close 钩子，返回 false 阻止关闭）
-//参数 action是 before-close 钩子，Vant 在你点弹窗按钮时自动调用它，
-// 并传一个 action 参数告诉你点的是哪个按钮：confirm 或 cancel
-const onNicknameConfirm = async (action) => {
-  // 点取消直接关闭
-  //return true = 允许弹窗关闭
-  if (action !== 'confirm') return true
-  //.trim() 去掉首尾空格
-  const val = nicknameInput.value.trim()
-  if (!val) {
-    showToast('昵称不能为空')
-    return false
-  }
-  if (val.length < 2 || val.length > 20) {
-    showToast('昵称长度需在 2-20 个字符之间')
-    return false
-  }
+  savingProfile.value = true
   try {
-    const res = await post('/auth/nickname', { nickname: val })
+    const res = await post('/auth/profile', {
+      nickname: profileForm.nickname.trim(),
+      email: profileForm.email || null,
+      phone: profileForm.phone || null,
+      bio: profileForm.bio || null,
+    })
     if (res.code === 0) {
-      // 更新页面显示
-      userName.value = val
-      // 更新 localStorage
+      userName.value = profileForm.nickname.trim()
+      userDesc.value = profileForm.bio || '欢迎使用智能旅游助手'
+      userEmail.value = profileForm.email
+      userPhone.value = profileForm.phone
       const user = JSON.parse(localStorage.getItem('user') || '{}')
-      user.nickname = val
+      user.nickname = profileForm.nickname.trim()
+      user.email = profileForm.email
+      user.phone = profileForm.phone
+      user.bio = profileForm.bio
       localStorage.setItem('user', JSON.stringify(user))
-      showToast('昵称修改成功')
-      return true
+      ElMessage.success('保存成功')
     } else {
-      showToast(res.msg)
-      return false
+      ElMessage.error(res.msg || '保存失败')
     }
   } catch (err) {
-    showToast('修改失败，请稍后重试')
-    return false
+    ElMessage.error('保存失败，请稍后重试')
+  } finally {
+    savingProfile.value = false
   }
 }
 
-// 点击头像 → 触发隐藏的文件选择框
+// 修改密码
+const changePassword = async () => {
+  if (!passwordFormRef.value) return
+  await passwordFormRef.value.validate(async (valid) => {
+    if (!valid) return
+
+    savingPassword.value = true
+    try {
+      const res = await post('/auth/password', {
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword,
+      })
+      if (res.code === 0) {
+        ElMessage.success('密码修改成功')
+        passwordForm.oldPassword = ''
+        passwordForm.newPassword = ''
+        passwordForm.confirmPassword = ''
+      } else {
+        ElMessage.error(res.msg || '修改失败')
+      }
+    } catch (err) {
+      ElMessage.error('修改失败，请稍后重试')
+    } finally {
+      savingPassword.value = false
+    }
+  })
+}
+
+// 头像上传
 const triggerAvatarInput = () => {
   if (!isLoggedIn.value) {
-    showToast('请先登录')
+    ElMessage.warning('请先登录')
+    router.push('/login')
     return
   }
   avatarInput.value.click()
 }
 
-// 选好文件后触发
-//参数 e 是 事件对象（Event），由浏览器在触发 change 时自动传入
 const handleAvatarChange = async (e) => {
-  //e.target 就是那个 <input type="file">。
-  //.files 是用户选中的文件列表（FileList），即使 multiple 没开，也是数组形式，取 [0]
   const file = e.target.files[0]
-  //用户点了"取消"没选任何文件时,退出不报错
   if (!file) return
 
-  // 转成 base64 字符串
-  //  创建文件读取器对象
-  //FileReader 是浏览器内置的文件读取 API，专门用来读取用户本地文件。
   const reader = new FileReader()
-  //读取完成后的回调
-  //onload 是一个事件处理属性，当文件读取完成时自动触发。
-  //回调函数里的 ev 是另一个事件对象，包含读取结果
-  //等下方的  reader.readAsDataURL(file) 读取完成后，才会触发 onload 事件。
   reader.onload = async (ev) => {
-    //ev.target 指向 reader 这个读取器对象。
-    //ev.target.result 是读取完成后的结果，这里是一个 base64 字符串。
-    //形如data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...
-    //FileReader 这个对象有一个内置属性叫 result，专门用来存放读取结果。
     const base64 = ev.target.result
-
-    // 先立刻显示在页面上（用户不用等）
-    //直接把 base64 赋值给它，Vue 会立刻刷新页面上的头像
     userAvatar.value = base64
 
-    // 再发给后端存数据库
     try {
       const res = await post('/auth/avatar', { avatar: base64 })
       if (res.code === 0) {
-        // 更新 localStorage，刷新不丢
         const user = JSON.parse(localStorage.getItem('user') || '{}')
         user.avatar = base64
         localStorage.setItem('user', JSON.stringify(user))
-        showToast('头像更换成功')
+        ElMessage.success('头像更换成功')
       } else {
-        showToast(res.msg)
+        ElMessage.error(res.msg || '上传失败')
       }
     } catch (err) {
-      showToast('上传失败')
+      ElMessage.error('上传失败')
     }
   }
   reader.readAsDataURL(file)
-
-  // 重置 input，否则下次选同一张图不触发 change
   e.target.value = ''
 }
+
 </script>
 
 <style scoped>
-.profile-container {
-  padding-bottom: 50px;
+.profile-page {
+  min-height: calc(100vh - 100px);
 }
 
-.user-info {
+/* 用户信息卡片 */
+.user-card {
+  margin-bottom: 20px;
+}
+
+.user-header {
   display: flex;
   align-items: center;
-  padding: 30px 20px;
-  background: linear-gradient(135deg, #1989fa 0%, #36cbcb 100%);
-  color: white;
+  gap: 24px;
 }
 
-.avatar {
+.avatar-wrap {
+  position: relative;
+  cursor: pointer;
   width: 80px;
   height: 80px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
-.user-details {
-  margin-left: 20px;
+.avatar-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+  font-size: 12px;
+  padding: 2px 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.avatar-wrap:hover .avatar-overlay {
+  opacity: 1;
+}
+
+.user-meta {
+  flex: 1;
 }
 
 .user-name {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 5px;
+  margin: 0 0 4px;
 }
 
 .user-desc {
   font-size: 14px;
-  opacity: 0.9;
+  color: #909399;
+  margin: 0 0 4px;
 }
 
-.menu-section {
-  margin-top: 15px;
-  background-color: white;
-  border-radius: 12px;
-  margin: 15px 10px 0;
-  overflow: hidden;
+.user-contact {
+  font-size: 13px;
+  color: #606266;
+  margin: 2px 0;
+  display: flex;
+  gap: 16px;
 }
 
-.menu-title {
-  font-size: 14px;
-  color: #646566;
-  padding: 12px 15px;
-  border-bottom: 1px solid #f0f0f0;
+.user-date {
+  font-size: 12px;
+  color: #c0c4cc;
+  margin: 0;
 }
 
-/* 未登录时菜单置灰 */
-.disabled-cell {
-  opacity: 0.5;
+.user-stats {
+  display: flex;
+  gap: 32px;
 }
 
-.disabled-cell :deep(.van-cell__right-icon) {
-  display: none;
-}
-
-.about-content {
+.user-stats .el-statistic {
   text-align: center;
-  line-height: 1.6;
 }
 
-.mt-2 {
-  margin-top: 8px;
+/* Tab 卡片 */
+.tab-card {
+  min-height: 400px;
 }
 
-.mt-4 {
-  margin-top: 16px;
-}
-
-.text-center {
-  text-align: center;
+/* 响应式：手机端统计卡片堆叠 */
+@media (max-width: 768px) {
+  .user-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  .user-stats {
+    gap: 20px;
+  }
 }
 </style>

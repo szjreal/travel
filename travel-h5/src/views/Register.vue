@@ -1,56 +1,96 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <van-nav-bar title="注册" left-arrow left-text="返回" @click-left="onBack" />
-    </div>
-    <div class="page-content">
-      <div class="register-logo">
-        <van-icon name="add-square-o" size="64px" color="#1989fa" />
-        <h2 class="register-title">创建账号</h2>
-        <p class="register-subtitle">注册后即可享受智能旅游服务</p>
+  <div class="register-container">
+    <!-- 左侧品牌展示区（CSS @media 控制手机端隐藏） -->
+    <div class="brand-side">
+      <div class="brand-content">
+        <div class="brand-logo">
+          <el-icon :size="40" color="#fff"><Suitcase /></el-icon>
+          <h1 class="brand-title">智能旅游助手</h1>
+        </div>
+        <p class="brand-slogan">加入我们，开启智能旅行</p>
+        <div class="brand-features">
+          <div class="feature-item" v-for="f in features" :key="f.text">
+            <span class="feature-icon">{{ f.icon }}</span>
+            <span class="feature-text">{{ f.text }}</span>
+          </div>
+        </div>
       </div>
+    </div>
 
-      <div class="card register-form">
-        <van-field
-          v-model="formData.username"
-          label="用户名"
-          placeholder="请输入用户名"
-          clearable
-          :border="false"
-          style="margin-bottom: 12px; border-radius: 8px; background-color: #f7f8fa;"
-        />
-        <van-field
-          v-model="formData.password"
-          label="密码"
-          placeholder="请输入密码"
-          type="password"
-          clearable
-          :border="false"
-          style="margin-bottom: 12px; border-radius: 8px; background-color: #f7f8fa;"
-        />
-        <van-field
-          v-model="formData.confirmPassword"
-          label="确认密码"
-          placeholder="请再次输入密码"
-          type="password"
-          clearable
-          @keyup.enter="handleRegister"
-          :border="false"
-          style="margin-bottom: 16px; border-radius: 8px; background-color: #f7f8fa;"
-        />
-        <van-button
+    <!-- 右侧注册表单区 -->
+    <div class="form-side">
+      <div class="form-content">
+        <h2 class="form-title">创建账号</h2>
+        <p class="form-subtitle">注册后即可享受智能旅游服务</p>
+
+        <el-form
+          ref="formRef"
+          :model="formData"
+          :rules="rules"
           size="large"
-          round
-          type="primary"
-          :loading="isLoading"
-          @click="handleRegister"
+          @submit.prevent="handleRegister"
         >
-          注册
-        </van-button>
+          <el-form-item prop="username">
+            <el-input
+              v-model="formData.username"
+              placeholder="请输入用户名（3-20字符）"
+              :prefix-icon="User"
+              clearable
+            />
+          </el-form-item>
 
-        <div class="register-footer">
+          <el-form-item prop="email">
+            <el-input
+              v-model="formData.email"
+              placeholder="请输入邮箱"
+              :prefix-icon="Message"
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item prop="password">
+            <el-input
+              v-model="formData.password"
+              type="password"
+              placeholder="请输入密码（至少6位）"
+              :prefix-icon="Lock"
+              show-password
+              clearable
+            />
+          </el-form-item>
+
+          <el-form-item prop="confirmPassword">
+            <el-input
+              v-model="formData.confirmPassword"
+              type="password"
+              placeholder="请再次输入密码"
+              :prefix-icon="Lock"
+              show-password
+              clearable
+              @keyup.enter="handleRegister"
+            />
+          </el-form-item>
+
+          <el-form-item prop="agree">
+            <el-checkbox v-model="formData.agree">
+              我已阅读并同意 <el-link type="primary" :underline="false">《用户协议》</el-link>
+            </el-checkbox>
+          </el-form-item>
+
+          <el-button
+            type="primary"
+            size="large"
+            :loading="isLoading"
+            class="register-btn"
+            @click="handleRegister"
+          >
+            注册
+          </el-button>
+        </el-form>
+
+        <div class="form-footer">
           已有账号？
-          <span class="link" @click="goLogin">去登录</span>
+          <el-link type="primary" :underline="false" @click="goLogin">去登录</el-link>
         </div>
       </div>
     </div>
@@ -58,101 +98,206 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { ElMessage } from 'element-plus'
+import { User, Lock, Message, Suitcase } from '@element-plus/icons-vue'
 import { post } from '@/untils/authRequest.js'
 
 const router = useRouter()
 
-// 表单数据
+const features = [
+  { icon: '✨', text: 'AI 智能行程规划' },
+  { icon: '🗺️', text: '场景化专家推荐' },
+  { icon: '💰', text: '预算可视化分析' },
+]
+
+const formRef = ref(null)
 const formData = reactive({
   username: '',
+  email: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
+  agree: false,
 })
 const isLoading = ref(false)
 
-// 返回上一页
-const onBack = () => {
-  router.back()
+const validateConfirmPassword = (rule, value, callback) => {
+  if (value !== formData.password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
 }
 
-// 跳登录页
+const validateAgree = (rule, value, callback) => {
+  if (!value) {
+    callback(new Error('请阅读并同意用户协议'))
+  } else {
+    callback()
+  }
+}
+
+const rules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 20, message: '用户名长度 3-20 个字符', trigger: 'blur' },
+  ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' },
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少 6 位', trigger: 'blur' },
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' },
+  ],
+  agree: [
+    { validator: validateAgree, trigger: 'change' },
+  ],
+}
+
 const goLogin = () => {
   router.push('/login')
 }
 
-// 注册
 const handleRegister = async () => {
-  // 1. 校验
-  if (!formData.username) {
-    showToast('请输入用户名')
-    return
-  }
-  if (!formData.password) {
-    showToast('请输入密码')
-    return
-  }
-  if (formData.password !== formData.confirmPassword) {
-    showToast('两次密码不一致')
-    return
-  }
+  if (!formRef.value) return
+  await formRef.value.validate(async (valid) => {
+    if (!valid) return
 
-  // 2. 调接口
-  isLoading.value = true
-  try {
-    const res = await post('/auth/register', {
-      username: formData.username,
-      password: formData.password
-    })
+    isLoading.value = true
+    try {
+      const res = await post('/auth/register', {
+        username: formData.username,
+        password: formData.password,
+      })
 
-    // 3. 判断返回结果
-    if (res.code === 0) {
-      showToast('注册成功')
-      // 注册成功后跳登录页
-      router.push('/login')
-    } else {
-      showToast(res.msg)
+      if (res.code === 0) {
+        ElMessage.success('注册成功，请登录')
+        router.push('/login')
+      } else {
+        ElMessage.error(res.msg || '注册失败')
+      }
+    } catch (err) {
+      ElMessage.error('网络错误，请稍后重试')
+    } finally {
+      isLoading.value = false
     }
-  } catch (err) {
-    showToast('网络错误，请稍后重试')
-  } finally {
-    isLoading.value = false
-  }
+  })
 }
 </script>
 
 <style scoped>
-.register-logo {
-  text-align: center;
-  padding: 40px 0 20px;
+.register-container {
+  display: flex;
+  min-height: 100vh;
+  background: #f0f2f5;
 }
 
-.register-title {
-  font-size: 22px;
-  color: #323233;
-  margin: 12px 0 6px;
+/* 左侧品牌区 */
+.brand-side {
+  flex: 1;
+  background: linear-gradient(135deg, #409eff 0%, #36cbcb 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
 
-.register-subtitle {
+.brand-content {
+  max-width: 360px;
+  padding: 40px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.brand-title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.brand-slogan {
+  font-size: 16px;
+  opacity: 0.85;
+  margin-bottom: 40px;
+}
+
+.brand-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+}
+
+.feature-icon {
+  font-size: 20px;
+}
+
+/* 右侧表单区 */
+.form-side {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.form-content {
+  width: 100%;
+  max-width: 380px;
+  padding: 40px;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #303133;
+  margin: 0 0 8px;
+}
+
+.form-subtitle {
   font-size: 14px;
-  color: #969799;
+  color: #909399;
+  margin: 0 0 32px;
 }
 
-.register-form {
+.register-btn {
+  width: 100%;
+}
+
+.form-footer {
+  text-align: center;
   margin-top: 20px;
-}
-
-.register-footer {
-  text-align: center;
-  margin-top: 16px;
   font-size: 14px;
-  color: #969799;
+  color: #909399;
 }
 
-.link {
-  color: #1989fa;
-  margin-left: 4px;
+/* 响应式：手机端隐藏品牌区，表单区全屏 */
+@media (max-width: 768px) {
+  .brand-side {
+    display: none;
+  }
+  .register-container {
+    flex-direction: column;
+  }
+  .form-side {
+    flex: 1;
+  }
 }
 </style>

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { showToast } from 'vant'
+import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 // 1. 创建 axios 实例，baseURL 指向 /api（不带 /travel）
@@ -53,14 +53,14 @@ authRequest.interceptors.request.use(
 authRequest.interceptors.response.use(
   response => {
     // 后端返回 { code: 0, token: "...", user: {...} }
-    //axios默认包一层data
+    // ← 剥掉 axios 的外层壳，只留后端的 JSON
     return response.data
   },
   error => {
     // 如果是 401（未登录或 token 过期）
     //HTTP 错误（401/500）后端返回的错误码
     if (error.response?.status === 401) {
-      showToast('登录已过期，请重新登录')
+      ElMessage.error('登录已过期，请重新登录')
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       router.push('/login')

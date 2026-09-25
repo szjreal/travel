@@ -122,7 +122,7 @@ router.get('/user', auth, async (req, res) => {
   try {
     // req.user.id 是中间件解出来的
     const [rows] = await pool.query(
-      'SELECT id, username, avatar, nickname, created_at FROM users WHERE id = ?',
+      'SELECT id, username, avatar, nickname, email, phone, bio, created_at FROM users WHERE id = ?',
       [req.user.id]
     );
     const user = rows[0];
@@ -155,11 +155,12 @@ router.post('/avatar', auth, async (req, res) => {
   }
 });
 
-// 修改昵称：POST /api/auth/nickname
-router.post('/nickname', auth, async (req, res) => {
+// 更新基本信息：POST /api/auth/profile（批量更新昵称/邮箱/手机/简介）
+router.post('/profile', auth, async (req, res) => {
   try {
-    const { nickname } = req.body;
-    // 校验：昵称不能为空，长度 2-20
+    const { nickname, email, phone, bio } = req.body;
+
+    // nickname 必填校验
     if (!nickname || !nickname.trim()) {
       return res.json({ code: 1, msg: '昵称不能为空' });
     }
@@ -167,16 +168,61 @@ router.post('/nickname', auth, async (req, res) => {
     if (trimmed.length < 2 || trimmed.length > 20) {
       return res.json({ code: 1, msg: '昵称长度需在 2-20 个字符之间' });
     }
+
+    // email 选填 + 格式校验
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.json({ code: 1, msg: '邮箱格式不正确' });
+    }
+
+    // phone 选填 + 11 位数字校验
+    if (phone && !/^\d{11}$/.test(phone)) {
+      return res.json({ code: 1, msg: '手机号需为 11 位数字' });
+    }
+
     await pool.query(
-      'UPDATE users SET nickname = ? WHERE id = ?',
-      [trimmed, req.user.id]
+      'UPDATE users SET nickname = ?, email = ?, phone = ?, bio = ? WHERE id = ?',
+      [trimmed, email || null, phone || null, bio || null, req.user.id]
     );
-    res.json({ code: 0, msg: '昵称修改成功' });
+    res.json({ code: 0, msg: '保存成功' });
   } catch (err) {
-    console.error('修改昵称失败:', err.message);
+    console.error('更新基本信息失败:', err.message);
     res.status(500).json({ code: 1, msg: '服务器错误' });
   }
 });
+
+// 修改密码：POST /api/auth/password
+router.post('/password', auth, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    // 参数校验
+    if (!oldPassword || !newPassword) {
+      return res.json({ code: 1, msg: '请填写完整' });
+    }
+    if (newPassword.length < 6) {
+      return res.json({ code: 1, msg: '新密码至少 6 位' });
+    }
+
+    // 查库验证旧密码（明文比对，与登录逻辑一致）
+    const [rows] = await pool.query(
+      'SELECT password FROM users WHERE id = ?',
+      [req.user.id]
+    );
+    if (!rows.length || rows[0].password !== oldPassword) {
+      return res.json({ code: 1, msg: '当前密码不正确' });
+    }
+
+    // 更新新密码
+    await pool.query(
+      'UPDATE users SET password = ? WHERE id = ?',
+      [newPassword, req.user.id]
+    );
+    res.json({ code: 0, msg: '密码修改成功' });
+  } catch (err) {
+    console.error('修改密码失败:', err.message);
+    res.status(500).json({ code: 1, msg: '服务器错误' });
+  }
+});
+
 // 收藏行程：POST /api/auth/favorite
 router.post('/favorite', auth, async (req, res) => {
   try {
@@ -208,11 +254,12 @@ router.post('/favorite', auth, async (req, res) => {
 // 获取我的收藏列表：GET /api/auth/favorites
 router.get('/favorites', auth, async (req, res) => {
   try {
+  // 1.req.user.id 来自 auth 中间件解 JWT 得到的
     const [rows] = await pool.query(
       'SELECT id, city, budget, days, plan_data, created_at FROM favorites WHERE user_id = ? ORDER BY created_at DESC',
       [req.user.id]
     );
-    // 把 plan_data 从字符串解析回对象
+    //2. 把 plan_data 从字符串解析回对象
     const list = rows.map(item => ({
        // ① 展开原有字段（id, city, budget, days, created_at）
       ...item,
@@ -220,6 +267,7 @@ router.get('/favorites', auth, async (req, res) => {
       //? :是三元运算符，如果item.plan_data存在，就解析为对象，否则返回null
       plan_data: item.plan_data ? JSON.parse(item.plan_data) : null
     }));
+    //3.返回给前端
     res.json({ code: 0, data: list });
   } catch (err) {
     console.error('获取收藏列表失败:', err.message);

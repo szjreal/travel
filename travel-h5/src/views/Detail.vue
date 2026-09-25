@@ -1,379 +1,220 @@
 <template>
-  <div class="page-container">
-   <div class="page-header">
-    <van-nav-bar fixed 
-    left-text="返回" 
-    left-arrow
-    @click="goBack" 
-    :title="formData.city+'行程规划'" />
-   </div>
-   <div class="page-content">
-  <div v-if="isLoading" class="loading-container">
-    <van-loading size="48ox" type="spinner">
-        正在生成旅游规划
-    </van-loading >
-  </div>
-  <div v-else-if="errorMsg && errorMsg.length > 0">
-    <van-button type="primary" @click="fetchTripData">重新生成</van-button>
-  
-  </div>
-<!-- 当上面两个分支都不成立时（既不在 loading，也没有 errorMsg），并且 tripData 已经有数据、
-且后端返回的 success 字段不为 false 时，
-才渲染整个行程内容（概览卡、每日折叠面板、预算表、温馨提示、注意事项）。 -->
- <template v-else-if="tripData && tripData.success !== false">
-  <div class="card overview-card">
-<div class="trip-header">
-  <h2>{{formData.city}}~{{formData.days}}天行程</h2>
-  <div class="trip-budget">预算：{{tripData.totalBudget}}元</div>
-</div>
-  </div>
-  <!-- van-collapse 是外层折叠容器，activeDays (Detail.vue#L107) 是一个 ref([]) 数组 -->
-  <van-collapse v-model="activeDays" class="trip-collapse">
-    <van-collapse-item v-for="day in tripData.dailyItinerary" 
-    :key="day.day" 
-    :title="'第'+day.day+'天'" 
-    :name="day.day">
-     <div class="day-schedule">
-<div class="schedule-section">
-  <div class="section-label morning">上午</div>
-  <!-- SpotItem 组件用于渲染景点信息 -->
-   <!-- :data是父子组件传值的方法 -->
-  <SpotItem :data="day.morning" /> 
-</div>
-<div class="schedule-section">
-  <div class="section-label afternoon">下午</div>
-   <!-- SpotItem 组件用于渲染景点信息 -->
-  <!-- :data是父子组件传值的方法 -->
-  <SpotItem :data="day.afternoon" /> 
-</div>
-<div class="schedule-section">
-  <div class="section-label evening">晚上</div>
-   <!-- SpotItem 组件用于渲染景点信息 -->
-  <!-- :data是父子组件传值的方法 -->
-  <SpotItem :data="day.evening" /> 
-</div>
-     </div>
-    </van-collapse-item>
-  </van-collapse>
-  <div class="card budget-card" v-if="tripData.budgetBreakdown">
-    <div class="section-title">预算</div>
- <BudgetTableVue :data="tripData.budgetBreakdown" :total="tripData.totalBudget"></BudgetTableVue>
-  </div>
-  <div class="card tips-card" v-if="tripData.tips && tripData.tips.length">
-    温馨提示
-  
- <ul class="tips-list">
-   <!-- index 是Vue 自动追加的下标（从 0 开始的整数 -->
-<li v-for="(tip,index) in tripData.tips" :key="index">{{tip}}</li>
- </ul></div>
+  <div class="detail-page" v-loading="isLoading">
+    <!-- 加载提示 -->
+    <div v-if="isLoading" class="loading-text">正在生成旅游规划...</div>
 
- <div class="card warings-card" v-if="tripData.warnings && tripData.warnings.length">
-    <div class="section-title">注意事项
-
+    <!-- 错误状态 -->
+    <div v-else-if="errorMsg" class="error-state">
+      <el-result icon="error" :title="errorMsg">
+        <template #extra>
+          <el-button type="primary" @click="fetchTripData">重新生成</el-button>
+        </template>
+      </el-result>
     </div>
-    <ul class="warnings-list">
-<li v-for="(warning,index) in tripData.warnings" :key="index">{{warning}}</li>
-    </ul>
+
+    <!-- 行程内容 -->
+    <template v-else-if="tripData && tripData.success !== false">
+      <!-- 概览卡片 -->
+      <el-card class="overview-card" shadow="hover">
+        <div class="trip-header">
+          <h2>{{ formData.city }} · {{ formData.days }}天行程</h2>
+          <span class="trip-budget">预算: ¥{{ tripData.totalBudget }}</span>
+        </div>
+      </el-card>
+
+      <!-- 每日行程折叠面板 -->
+      <el-card class="itinerary-card" shadow="hover">
+        <el-collapse v-model="activeDays">
+          <el-collapse-item
+            v-for="day in tripData.dailyItinerary"
+            :key="day.day"
+            :title="`第 ${day.day} 天`"
+            :name="day.day"
+          >
+            <div class="day-schedule">
+              <div class="schedule-section">
+                <el-tag type="warning" effect="plain" size="small">上午</el-tag>
+                <SpotItem :data="day.morning" />
+              </div>
+              <div class="schedule-section">
+                <el-tag type="primary" effect="plain" size="small">下午</el-tag>
+                <SpotItem :data="day.afternoon" />
+              </div>
+              <div class="schedule-section">
+                <el-tag type="success" effect="plain" size="small">晚上</el-tag>
+                <SpotItem :data="day.evening" />
+              </div>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </el-card>
+
+      <!-- 预算分解 -->
+      <el-card v-if="tripData.budgetBreakdown" class="budget-card" shadow="hover">
+        <template #header>💰 预算分解</template>
+        <BudgetTable :data="tripData.budgetBreakdown" :total="tripData.totalBudget" />
+      </el-card>
+
+      <!-- 温馨提示 -->
+      <el-card v-if="tripData.tips && tripData.tips.length" class="tips-card" shadow="hover">
+        <template #header>💡 温馨提示</template>
+        <ul class="tips-list">
+          <li v-for="(tip, i) in tripData.tips" :key="i">{{ tip }}</li>
+        </ul>
+      </el-card>
+
+      <!-- 注意事项 -->
+      <el-card v-if="tripData.warnings && tripData.warnings.length" class="warnings-card" shadow="hover">
+        <template #header>⚠️ 注意事项</template>
+        <ul class="warnings-list">
+          <li v-for="(w, i) in tripData.warnings" :key="i">{{ w }}</li>
+        </ul>
+      </el-card>
+
+      <!-- 底部操作栏 -->
+      <div class="detail-actions">
+        <el-button :type="isFavorited ? 'warning' : 'default'" @click="handleFavorite">
+          <el-icon><component :is="isFavorited ? 'StarFilled' : 'Star'" /></el-icon>
+          {{ isFavorited ? '已收藏' : '收藏行程' }}
+        </el-button>
+        <el-button type="primary" @click="goToChat">咨询 AI 助手</el-button>
+      </div>
+    </template>
   </div>
 </template>
-   </div>
-   <div class="detail-footer" v-if="tripData && tripData.success !==false">
-<div class="footer-buttons">
-  <van-button
-    :type="isFavorited ? 'warning' : 'default'"
-    size="large"
-    round
-    @click="handleFavorite"
-    class="favorite-btn"
-  >
-    <van-icon
-      :name="isFavorited ? 'star' : 'star-o'"
-      :color="isFavorited ? '#fff' : '#ee0a24'"
-    />
-    {{ isFavorited ? '已收藏' : '收藏行程' }}
-  </van-button>
-  <van-button type="primary" size="large" round @click="goToChat('/chat')" class="primary-button">咨询AI助手</van-button>
-</div>
-   </div>
-  </div>
-</template>
+
 <script setup>
-import {onMounted} from 'vue'
-import {useRoute,useRouter} from 'vue-router'
-import {post} from '@/untils/request'
-import {post as authPost, get as authGet} from '@/untils/authRequest'
-import {showToast} from 'vant'
-import SpotItem from '../components/SpotItem.vue'
-import BudgetTableVue from '../components/BudgetTable.vue'
+import { reactive, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { Star, StarFilled } from '@element-plus/icons-vue'
+import { post } from '@/untils/request'
+import { post as authPost, get as authGet } from '@/untils/authRequest'
+import SpotItem from '@/components/SpotItem.vue'
+import BudgetTable from '@/components/BudgetTable.vue'
+
 const route = useRoute()
 const router = useRouter()
-import { reactive,ref } from 'vue'
-//通过底下onmounted获取formData中的数据
-const formData = reactive({
-  city: '',
-  budget: null,
-  days:null
-})
+
+const formData = reactive({ city: '', budget: null, days: null })
 const activeDays = ref([])
 const tripData = ref(null)
 const errorMsg = ref('')
-//加载状态
 const isLoading = ref(true)
-// 收藏状态
 const isFavorited = ref(false)
-//获取行程数据
-//
-const fetchTripData = async ()=>{
-  //onMounted中得到formData中的数据
-  const res = await post('recommend',{
-    city:formData.city,
-    budget:formData.budget,
-    days:formData.days
+
+// 获取行程数据
+const fetchTripData = async () => {
+  const res = await post('recommend', {
+    city: formData.city,
+    budget: formData.budget,
+    days: formData.days,
   })
-  console.log(res)
-  if (res && res.success!==false){
+  if (res && res.success !== false) {
     isLoading.value = false
     tripData.value = res
-    // 行程获取成功后，检查收藏状态
     checkFavoriteStatus()
-  }else{
-    
+  } else {
     errorMsg.value = res.error || '获取行程数据失败'
   }
 }
 
-// 检查是否已收藏（已登录才查）
+// 检查收藏状态
 const checkFavoriteStatus = async () => {
-  // 在login登录后端时候传到浏览器的token
   const token = localStorage.getItem('token')
   if (!token) return
   try {
     const res = await authGet('/auth/favorite/check', {
       city: formData.city,
-      days: formData.days
+      days: formData.days,
     })
     if (res.code === 0) {
       isFavorited.value = res.favorited
     }
-  } catch (e) {
-    // 401 等错误静默处理，不影响页面
-  }
+  } catch (e) { /* 静默 */ }
 }
-// 页面加载时，从 URL 参数中获取目的地、预算、行程天数
-onMounted(()=>{
-  formData.city = route.query.city
-  formData.budget = route.query.budget
-  formData.days = route.query.days
 
-  // 如果是从收藏页跳来的，直接用 sessionStorage 里的数据展示，不重新请求 AI
+// onMounted
+onMounted(() => {
+  formData.city = route.query.city
+  formData.budget = Number(route.query.budget)
+  formData.days = Number(route.query.days)
+
+  // 从 PlanWizard 跳转：读取 planResult
+  const planResult = sessionStorage.getItem('planResult')
+  if (planResult) {
+    tripData.value = JSON.parse(planResult)
+    isLoading.value = false
+    sessionStorage.removeItem('planResult')
+    return
+  }
+
+  // 从收藏页跳转：读取 favoritePlan
   if (route.query.from === 'favorite') {
     const favoritePlan = sessionStorage.getItem('favoritePlan')
     if (favoritePlan) {
       const plan = JSON.parse(favoritePlan)
       tripData.value = plan.plan_data
-      isFavorited.value = true   // 已收藏状态
+      isFavorited.value = true
       isLoading.value = false
-      // 用完就清掉，避免下次进来还用旧数据
       sessionStorage.removeItem('favoritePlan')
       return
     }
   }
 
-  if(formData.city && formData.budget && formData.days){
+  if (formData.city && formData.budget && formData.days) {
     fetchTripData()
   }
 })
-const goBack = () => {
-  router.back()
-}
-const goToChat =()=>{
-  router.push({
-    path:'/chat',
-    query:{
-      scene:'chat',
-      city:formData.city,
 
-    }
-  })
+const goToChat = () => {
+  router.push({ path: '/chat', query: { scene: 'chat', city: formData.city } })
 }
+
 // 收藏行程
 const handleFavorite = async () => {
-  // 1. 检查是否登录
   const token = localStorage.getItem('token')
   if (!token) {
-    showToast('请先登录后再收藏')
-    //进入/login页面，同时redirect作为参数代表route.fullPath自动从当前页面获取到的？后面的数据
-    //然后放在/login？后面url就变成http://localhost:5173/login?city=%E5%8C%97%E4%BA%AC&budget=300&days=2
+    ElMessage.warning('请先登录后再收藏')
     router.push({ path: '/login', query: { redirect: route.fullPath } })
     return
   }
-  // 2. 已收藏 → 不再重复操作
   if (isFavorited.value) {
-    showToast('已收藏过该行程')
+    ElMessage.info('已收藏过该行程')
     return
   }
-  // 3. 调后端收藏接口
   try {
     const res = await authPost('/auth/favorite', {
       city: formData.city,
       budget: formData.budget,
       days: formData.days,
-      //因为const tripData = ref(null)   // 第108行
-      //因为有ref，所以tripData北value{}又套了一层
-      plan_data: tripData.value
+      plan_data: tripData.value,
     })
     if (res.code === 0) {
-      // 首次收藏 或 查重命中（已收藏），都把状态置为已收藏
       isFavorited.value = true
-      showToast(res.msg)
+      ElMessage.success(res.msg)
     } else {
-      showToast(res.msg)
+      ElMessage.error(res.msg)
     }
   } catch (err) {
-    showToast('收藏失败，请稍后重试')
+    ElMessage.error('收藏失败，请稍后重试')
   }
 }
 </script>
+
 <style scoped>
-.page-header {
-   height: 50px;
+.detail-page { min-height: calc(100vh - 100px); }
+.loading-text { text-align: center; padding: 40px; color: #909399; }
+.overview-card, .itinerary-card, .budget-card, .tips-card, .warnings-card { margin-bottom: 16px; }
+.trip-header { display: flex; justify-content: space-between; align-items: center; }
+.trip-header .trip-budget { font-size: 16px; color: #f56c6c; font-weight: 600; }
+.day-schedule { padding: 8px 0; }
+.schedule-section { margin-bottom: 16px; }
+.schedule-section .el-tag { margin-bottom: 8px; }
+.tips-list, .warnings-list { list-style: none; padding: 0; margin: 0; }
+.tips-list li, .warnings-list li {
+  padding: 8px 0; color: #606266; font-size: 14px; border-bottom: 1px solid #f0f2f5;
 }
-.page-container {
-    min-height: 100vh;
-    background-color: #f5f5f5;
-    padding-bottom: 70px;
-}
-.card {
-    background-color: #fff;
-    border-radius: 8px;
-    padding: 16px;
-    margin-bottom: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-.section-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #323233;
-    margin-bottom: 12px;
-}
-.page-content {
-    padding: 16px;
-}
-.overview-card {
-  margin-bottom: 16px;
-}
-
-.trip-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.trip-header h2 {
-  font-size: 20px;
-  color: #323233;
-  margin: 0;
-}
-
-.trip-budget {
-  font-size: 16px;
-  color: #ee0a24;
-  font-weight: 600;
-}
-
-.trip-collapse {
-  margin-bottom: 16px;
-}
-
-.day-schedule {
-  padding: 8px 0;
-}
-
-.schedule-section {
-  margin-bottom: 16px;
-}
-
-.schedule-section:last-child {
-  margin-bottom: 0;
-}
-
-.section-label {
-  font-size: 14px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-bottom: 8px;
-}
-
-.section-label.morning {
-  background: #fff7e6;
-  color: #fa8c16;
-}
-
-.section-label.afternoon {
-  background: #e6f7ff;
-  color: #1890ff;
-}
-
-.section-label.evening {
-  background: #f6ffed;
-  color: #52c41a;
-}
-
-.budget-card,
-.tips-card,
-.warnings-card {
-  margin-bottom: 16px;
-}
-
-.tips-list,
-.warnings-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.tips-list li,
-.warnings-list li {
-  padding: 8px 0;
-  color: #666;
-  font-size: 14px;
-  border-bottom: 1px solid #f5f5f5;
-}
-
-.tips-list li:last-child,
-.warnings-list li:last-child {
-  border-bottom: none;
-}
-
-.detail-footer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 12px 16px;
-  background: #fff;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
-  max-width: 750px;
-  margin: 0 auto;
-}
-
-.footer-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.footer-buttons .favorite-btn {
-  flex: 1;
-}
-
-.footer-buttons .primary-button {
-  flex: 2;
-}
-
-.error-card {
-  text-align: center;
-  padding: 40px 16px;
-}
+.tips-list li:last-child, .warnings-list li:last-child { border-bottom: none; }
+.detail-actions { display: flex; gap: 12px; margin-top: 20px; }
 </style>

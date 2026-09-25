@@ -1,112 +1,202 @@
 import express from 'express';
 import travelService from '../service/travelService.js';
 import {createStreamResponse} from '../untils/streamUtils.js';
-// app 是整个应用，router 是"子路由"
-// 1. 两者的角色
-// app = express()：整个服务器应用，一个项目只有一个，负责绑定端口、注册全局中间件
-// express.Router()：创建一个迷你路由实例（可以理解为“子应用”），专门用来管理某一组接口，最后挂载到 app 上
+import pool from '../db/index.js';
+import auth from '../middleware/auth.js';
+import jwt from 'jsonwebtoken';
 
-//创建路由模块
 const router = express.Router();
-//创建推荐景点接口
 
-//city,budget,days与前端的
-// const formData = reactive({
-//   city: '',
-//   budget: null,
-//   days:null
-// })相关联
+// 推荐景点接口
 router.post("/recommend", async (req, res) => {
-    //前端post请求body是JSON格式
-    //     {
-    //   "city": "北京",
-    //   "budget": 1000,
-    //   "days": 3
-    // }
-    // 经过express.json()中间件处理后，挂载到req.body对象上
-    // req.body = {
-    //   city: "北京",
-    //   budget: 1000,
-    //   days: 3
-    // }
-    //   const {city,budget,days} = req.body;能自动拿到city,budget,days的值
-    const {city,budget,days} = req.body;
-    //检查参数是否为空
-    if(!city || !budget || !days){
-        return res.status(400).json({
-            success: false,
-            message: '参数错误'});
+    const {city, budget, days} = req.body;
+    if (!city || !budget || !days) {
+        return res.status(400).json({ success: false, message: '参数错误' });
     }
-    //调用recommend方法
-    const result = await travelService.recommend(city,budget,days);
-    //发送到前端
+    const result = await travelService.recommend(city, budget, days);
     return res.json(result);
-    // return res.json({message: '推荐景点'});
-
-})
-router.post("/chat", async (req, res) => {
-    // 【修改-对话记忆】从请求体解构出 history，默认空数组
-    // history 是前端传过来的历史对话数组，格式：[{role:'user',content:'...'}, {role:'ai',content:'...'}]
-    // 用户在输入框敲 "怎么去？" 并点发送
-    //    ↓
-// 前端发 POST /chat，body 里带 { message: "怎么去？", history: [...] }
-//        ↓
-// Express 收到，解析成 req.body
-//        ↓
-// travel.js L38: const { message } = req.body   → message = "怎么去？"
-//        ↓
-// travel.js L48: travelService.chat(message, ...)  → 把 "怎么去？" 传进去
-//        ↓
-// travelService.js L200: async chat(message, ...) → message = "怎么去？"
-//        ↓
-// travelService.js L223: messages.push(new HumanMessage(message))
-//                       → new HumanMessage("怎么去？")
-
-//会自动找req.body里的message和history内容，如果history是空的，则用[]代替
-//Chat.vue:144	组装 {message:userMsg, history:history}
-//假如前端发来
-// POST /api/travel/chat
-// Body:
-// {
-//   "message": "北京有哪些景点？",
-//   "history": [{ "role": "user", "content": "北京有哪些景点？" }]
-// }
-    const {message, history = []} = req.body;
-// message = "北京有哪些景点？"
-// history = [{ role: 'user', content: '北京有哪些景点？' }]
-
-    if(!message){
-        return res.status(400).json({
-            success: false,
-            message: '参数错误'});
-    }
-//创建 SSE 流式响应通道
-//res是Express 框架传给路由回调的"响应对象"，
-// 不是什么具体的数据，createStreamResponse是对res的处理，
-// 让它变成sse流式响应
-const stream = createStreamResponse(res);
-//调用大模型获取流式布局
-// 【修改-对话记忆】把 history 透传给 service 层，由 service 层把它拼装成大模型能识别的消息列表
-//message, history 是前端传过来的参数，(chunk)=>{stream.send({type:'chunk',content:chunk}}函数
-// 是给travelService.js的streamCallback
-                                                   
-                                                   // 把{type:'chunk',content:chunk} 发送给前端
-                                                   //content: chunk 里面的chunk是(chunk) =>里的chunk
-//travelService.chat 是 async 函数，async 函数有一个关键约定：
-// 函数内部执行 return xxx 这一行时才算结束
-const result = await travelService.chat(message, history, (chunk)=>{
-    stream.send({type:'chunk',content:chunk});
-    //第 1 步：JSON.stringify(data) 把对象转字符串
-// 输入：{type:'chunk', content:'北'}（JS 对象）
-// 输出：'{"type":"chunk","content":"\u5317"}'（字符串）
-   //第 2 步：拼成 SSE 规定格式
-//data: {"type":"chunk","content":"\u5317"}\n\n
-   //第 3 步：res.write(...) 写入 HTTP 响应流
-//res.write 不会关连接，可以一直写、一直写……直到 res.end() 才关。   
 });
-stream.end();
 
-})
+// SSE 流式对话 + 存储消息
+router.post("/chat", async (req, res) => {
+    const { message, history = [], session_id, scene } = req.body;
 
-//导出路由模块
+    if (!message) {
+        return res.status(400).json({ success: false, message: '参数错误' });
+    }
+
+    // 从请求头提取 token 获取 user_id（可选，未登录则不存储）
+    let userId = null;
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token) {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            userId = decoded.id;
+        }
+    } catch (e) { /* token 无效，不存储，但不影响对话 */ }
+
+    // 如果有 user_id 但无 session_id，新建 chat_sessions 记录
+    let currentSessionId = session_id;
+    if (userId && !currentSessionId && scene !== 'pk') {
+        const title = message.substring(0, 30);
+        const [result] = await pool.execute(
+            'INSERT INTO chat_sessions (user_id, title, scene, message_count) VALUES (?, ?, ?, 0)',
+            [userId, title, scene || 'general']
+        );
+        currentSessionId = result.insertId;
+    }
+
+    // 如果有 user_id，存储用户消息到 chat_messages
+    if (userId && currentSessionId) {
+        await pool.execute(
+            'INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)',
+            [currentSessionId, 'user', message]
+        );
+    }
+
+    const stream = createStreamResponse(res);
+
+    // 如果新建了 session，先发送 session_id 事件
+    if (userId && !session_id && currentSessionId) {
+        stream.send({ type: 'session', session_id: currentSessionId });
+    }
+
+    let fullAiResponse = '';
+
+    const result = await travelService.chat(message, history, (chunk) => {
+        stream.send({ type: 'chunk', content: chunk });
+        fullAiResponse += chunk;
+    });
+
+    stream.end();
+
+    // AI 回复完成后，存储完整 AI 消息并更新 message_count
+    if (userId && currentSessionId && fullAiResponse) {
+        await pool.execute(
+            'INSERT INTO chat_messages (session_id, role, content) VALUES (?, ?, ?)',
+            [currentSessionId, 'ai', fullAiResponse]
+        );
+        await pool.execute(
+            'UPDATE chat_sessions SET message_count = message_count + 2, updated_at = NOW() WHERE id = ?',
+            [currentSessionId]
+        );
+    }
+});
+
+// ============ 新增 GET API（均需 auth 中间件） ============
+
+// 会话列表
+router.get("/sessions", auth, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT id, title, scene, tag, tag_type, message_count, created_at, updated_at FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC',
+            [req.user.id]
+        );
+        res.json({ code: 0, data: rows });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取会话列表失败' });
+    }
+});
+
+// 会话消息
+router.get("/sessions/:id/messages", auth, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT id, role, content, created_at FROM chat_messages WHERE session_id = ? ORDER BY created_at ASC',
+            [req.params.id]
+        );
+        res.json({ code: 0, data: rows });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取会话消息失败' });
+    }
+});
+
+// 分页历史
+router.get("/history", auth, async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+        const offset = (page - 1) * pageSize;
+        // LIMIT/OFFSET 直接拼数字，MySQL2 预处理参数化有时会因类型报错
+        const [rows] = await pool.execute(
+            `SELECT id, title, scene, tag, tag_type, message_count, created_at, updated_at FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT ${pageSize} OFFSET ${offset}`,
+            [req.user.id]
+        );
+        const [countRows] = await pool.execute(
+            'SELECT COUNT(*) as total FROM chat_sessions WHERE user_id = ?',
+            [req.user.id]
+        );
+        res.json({ code: 0, data: { list: rows, total: countRows[0].total } });
+    } catch (e) {
+        console.error('[/history] error:', e);
+        res.status(500).json({ code: 1, msg: '获取历史记录失败' });
+    }
+});
+
+// 统计数据
+router.get("/stats", auth, async (req, res) => {
+    try {
+        const [chatCount] = await pool.execute('SELECT COUNT(*) as count FROM chat_sessions WHERE user_id = ?', [req.user.id]);
+        const [favCount] = await pool.execute('SELECT COUNT(*) as count FROM favorites WHERE user_id = ?', [req.user.id]);
+        const [cityCount] = await pool.execute('SELECT COUNT(DISTINCT city) as count FROM favorites WHERE user_id = ?', [req.user.id]);
+        const [monthActive] = await pool.execute("SELECT COUNT(DISTINCT DATE(updated_at)) as count FROM chat_sessions WHERE user_id = ? AND updated_at >= DATE_FORMAT(NOW(), '%Y-%m-01')", [req.user.id]);
+        const [spotCount] = await pool.execute("SELECT COUNT(*) as count FROM chat_messages m JOIN chat_sessions s ON m.session_id = s.id WHERE s.user_id = ? AND m.content LIKE '%景点%'", [req.user.id]);
+        res.json({ code: 0, data: { chatCount: chatCount[0].count, favoriteCount: favCount[0].count, cityCount: cityCount[0].count, monthActive: monthActive[0].count, spotCount: spotCount[0].count } });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取统计数据失败' });
+    }
+});
+
+// 近7天趋势
+router.get("/chat-trend", auth, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            "SELECT DATE(created_at) as date, COUNT(*) as count FROM chat_messages m JOIN chat_sessions s ON m.session_id = s.id WHERE s.user_id = ? AND m.created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) GROUP BY DATE(created_at) ORDER BY date ASC",
+            [req.user.id]
+        );
+        res.json({ code: 0, data: rows });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取趋势数据失败' });
+    }
+});
+
+// 最近3条会话
+router.get("/recent-chats", auth, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT id, title, tag, tag_type, updated_at FROM chat_sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 3',
+            [req.user.id]
+        );
+        res.json({ code: 0, data: rows });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取最近会话失败' });
+    }
+});
+
+// 场景排行
+router.get("/scene-ranking", auth, async (req, res) => {
+    try {
+        const [rows] = await pool.execute(
+            'SELECT scene, COUNT(*) as count FROM chat_sessions WHERE user_id = ? GROUP BY scene ORDER BY count DESC',
+            [req.user.id]
+        );
+        const total = rows.reduce((sum, r) => sum + r.count, 0);
+        const data = rows.map(r => ({ scene: r.scene, count: r.count, percent: total > 0 ? Math.round(r.count / total * 100) : 0 }));
+        res.json({ code: 0, data });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '获取场景排行失败' });
+    }
+});
+
+// 删除会话（POST 方式）
+router.post("/sessions/:id/delete", auth, async (req, res) => {
+    try {
+        await pool.execute('DELETE FROM chat_messages WHERE session_id = ?', [req.params.id]);
+        await pool.execute('DELETE FROM chat_sessions WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+        res.json({ code: 0, msg: '删除成功' });
+    } catch (e) {
+        res.status(500).json({ code: 1, msg: '删除失败' });
+    }
+});
+
 export default router;

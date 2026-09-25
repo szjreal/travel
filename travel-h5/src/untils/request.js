@@ -51,7 +51,7 @@ export function get(url,params){
 
 
 //处理流式接口
-export async function fetchStream(url,data,onChunk,onError,onComplete,onAbort){
+export async function fetchStream(url,data,onChunk,onError,onComplete,onAbort,onSession){
         //1. 创建可中断控制器并发起请求
 //创建请求控制器，AbortController()是js自带的控制器，浏览器原生 API，用于中断请求
 //作用：如果需要中断请求，可以调用 controller.abort()
@@ -65,7 +65,8 @@ try{
     method:'POST',
     //告诉后端，请求体是 JSON 格式
     headers:{
-        'Content-Type':'application/json'
+        'Content-Type':'application/json',
+        ...(localStorage.getItem('token') ? { Authorization: 'Bearer ' + localStorage.getItem('token') } : {})
     },
     //这就是实际发送到后端的数据
 
@@ -192,6 +193,9 @@ try{
         // → 现在会跳回 Chat.vue 的 (chunk)=>{...} 那段代码执行        
        if(jsonData.type === 'chunk'){
         onChunk(jsonData.content)
+       }
+       else if(jsonData.type === 'session'){
+        if(onSession) onSession(jsonData.session_id)
        }
        //如果后端返回的是类型为 done 的数据
        //调用 Chat.vue 传入的 onComplete 回调
